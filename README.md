@@ -6,7 +6,19 @@ Personal collection of agent skills.
 
 Agent skill loaders (opencode, Claude Code, …) auto-discover **one level deep**: `<skills-dir>/<name>/SKILL.md`. So each skill folder must sit directly under `~/.agents/skills/` (or `.agents/skills/`), not nested under a namespace.
 
-**Clone + symlink each skill in** (safe when the skills dir is already populated — adds these skills without touching others):
+**Clone + symlink each skill in** (safe when the skills dir is already populated — adds these skills without touching others).
+
+Fish:
+
+```fish
+git clone https://github.com/tnfssc/skills.git ~/.tnfssc-skills
+mkdir -p ~/.agents/skills
+for d in ~/.tnfssc-skills/*/
+    test -f "$d/SKILL.md"; and ln -sfn "$d" ~/.agents/skills/
+end
+```
+
+Bash/POSIX:
 
 ```sh
 git clone https://github.com/tnfssc/skills.git ~/.tnfssc-skills
@@ -14,15 +26,7 @@ mkdir -p ~/.agents/skills
 for d in ~/.tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] && ln -sfn "$d" ~/.agents/skills/; done
 ```
 
-Project-local:
-
-```sh
-git clone https://github.com/tnfssc/skills.git .tnfssc-skills
-mkdir -p .agents/skills
-for d in .tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] && ln -sfn "$d" .agents/skills/; done
-```
-
-Update later with `git pull` inside the clone (symlinks stay live). Remove with `rm -rf ~/.tnfssc-skills ~/.agents/skills/cua-driver ...` (one rm per skill).
+Project-local — same loop using `.tnfssc-skills` and `.agents/skills` in the current project. Update later with `git pull -C ~/.tnfssc-skills` (symlinks stay live). Remove with `rm -rf ~/.tnfssc-skills` plus `rm ~/.agents/skills/cua-driver ~/.agents/skills/host-sharath …`.
 
 If the skills dir is empty/dedicated, you can skip symlinking and clone directly: `git clone https://github.com/tnfssc/skills.git ~/.agents/skills`.
 

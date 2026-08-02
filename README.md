@@ -1,6 +1,10 @@
-# [tnfssc/skills](.)
+<p align="center">
+  <img src="public/logo.svg" alt="tnfssc/skills" width="88" height="88">
+</p>
 
-Personal collection of agent skills.
+<h1 align="center"><a href=".">tnfssc/skills</a></h1>
+
+<p align="center">Personal collection of agent skills.</p>
 
 ## Install
 

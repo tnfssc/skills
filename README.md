@@ -6,6 +6,7 @@ Personal collection of agent skills.
 
 | Skill | Description | Source |
 |-------|-------------|--------|
+| [cua-driver](cua-driver/) | Drive native GUI apps (snapshot AX tree, click/type/scroll, verify) via the cua-driver CLI/MCP | [trycua/cua](https://github.com/trycua/cua) |
 | [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |
 | [jira-cli](jira-cli/) | Work with Jira issues, sprints, boards, projects, and JQL using the `jira` CLI | Local zip |
 | [mcpc](mcpc/) | Shell CLI for MCP servers — connect, list/call tools, read resources, async tasks | [apify/mcpc](https://github.com/apify/mcpc) |

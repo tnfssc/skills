@@ -6,6 +6,7 @@ Personal collection of agent skills.
 
 | Skill | Description | Source |
 |-------|-------------|--------|
+| [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |
 | [jira-cli](jira-cli/) | Work with Jira issues, sprints, boards, projects, and JQL using the `jira` CLI | Local zip |
 | [mcpc](mcpc/) | Shell CLI for MCP servers — connect, list/call tools, read resources, async tasks | [apify/mcpc](https://github.com/apify/mcpc) |
 | [open-browser-use](open-browser-use/) | Guidance for installing, verifying, troubleshooting, and operating Open Browser Use | Local zip |

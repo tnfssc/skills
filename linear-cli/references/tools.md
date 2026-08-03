@@ -1,0 +1,62 @@
+# Tool catalog (57 tools on mcp.linear.app/mcp, snapshot 2026-08-03)
+
+Discover live: `linear tools [pattern]`; full schema: `mcpc @linear tools-get <name>`;
+invoke raw: `linear call <name> key:=value ...` (mcpc arg syntax, values auto-parsed as JSON).
+
+- `get_attachment` (id) — required: id
+- `prepare_attachment_upload` (issue, filename, contentType, size, title, subtitle) — required: issue, filename, contentType, size
+- `create_attachment_from_upload` (issue, assetUrl, title, subtitle) — required: issue, assetUrl
+- `create_attachment` (issue, base64Content, filename, contentType, size, sha256, title, subtitle) — required: issue, base64Content, filename, contentType, sha256
+- `delete_attachment` (id) — required: id
+- `list_agent_skills` (limit, cursor, orderBy)
+- `get_agent_skill` (id) — required: id
+- `list_comments` (limit, cursor, orderBy, issueId, projectId, initiativeId, documentId, milestoneId, statusUpdateId, statusUpdateType)
+- `save_comment` (id, issueId, projectId, initiativeId, documentId, milestoneId, statusUpdateId, statusUpdateType, parentId, body) — required: body
+- `delete_comment` (id) — required: id
+- `list_cycles` (teamId, type) — required: teamId
+- `get_document` (id) — required: id
+- `list_documents` (limit, cursor, orderBy, query, projectId, initiativeId, teamId, creatorId, createdAt, updatedAt, includeArchived, fields)
+- `save_document` (id, title, content, patch, project, issue, initiative, cycle, team, icon, color)
+- `extract_images` (markdown) — required: markdown
+- `get_issue` (id, includeRelations, includeCustomerNeeds, includeReleases) — required: id
+- `list_issues` (limit, cursor, orderBy, query, team, state, cycle, label, assignee, delegate, project, release, priority, parentId, fields, createdAt, updatedAt, includeArchived)
+- `save_issue` (id, title, description, patch, team, cycle, milestone, priority, project, state, assignee, delegate, labels, dueDate, slaBreachesAt, slaType, parentId, estimate, links, setReleases, addReleases, removeReleases, blocks, blockedBy, relatedTo, duplicateOf, removeBlocks, removeBlockedBy, removeRelatedTo)
+- `list_issue_statuses` (team) — required: team
+- `get_issue_status` (id, name, team) — required: id, name, team
+- `list_issue_labels` (limit, cursor, orderBy, name, team)
+- `create_issue_label` (name, description, color, teamId, parent, isGroup) — required: name
+- `list_projects` (limit, cursor, orderBy, query, state, initiative, team, member, label, createdAt, updatedAt, includeMilestones, includeMembers, includeArchived, fields)
+- `get_project` (query, includeMilestones, includeMembers, includeResources) — required: query
+- `save_project` (id, name, icon, color, summary, description, state, startDate, startDateResolution, targetDate, targetDateResolution, priority, addTeams, removeTeams, setTeams, labels, lead, addInitiatives, removeInitiatives, setInitiatives)
+- `list_project_labels` (limit, cursor, orderBy, name)
+- `list_release_pipelines` (limit, cursor, orderBy, query, team, type, isProduction, includeStages, includeTeams, createdAt, updatedAt, includeArchived)
+- `list_releases` (limit, cursor, orderBy, query, pipeline, stage, stageType, version, hasReleaseNotes, includeReleaseNotes, createdAt, updatedAt, includeArchived)
+- `get_release` (id, includeReleaseNotes) — required: id
+- `save_release` (id, name, description, version, pipeline, stage, startDate, targetDate, createdAt, startedAt, completedAt, commitSha)
+- `list_release_notes` (limit, cursor, orderBy, query, pipeline, release, includeContent, includeReleases, createdAt, updatedAt, includeArchived)
+- `get_release_note` (id, includeReleases) — required: id
+- `save_release_note` (id, pipeline, title, content, releases, rangeFromRelease, rangeToRelease)
+- `get_diff` (urlOrId) — required: urlOrId
+- `list_diffs` (limit, cursor, orderBy, query, owner, repo, status)
+- `get_diff_threads` (urlOrId, threadId, resolved, orderBy) — required: urlOrId
+- `save_diff_comment` (urlOrId, commentId, parentId, body, anchor) — required: body
+- `resolve_diff_thread` (threadId, resolved) — required: threadId
+- `delete_diff_comment` (commentId) — required: commentId
+- `submit_diff_review` (urlOrId, decision, body) — required: urlOrId, decision
+- `merge_diff` (urlOrId, mergeMethod) — required: urlOrId
+- `list_milestones` (project) — required: project
+- `get_milestone` (project, query) — required: project, query
+- `save_milestone` (project, id, name, description, targetDate) — required: project
+- `list_teams` (limit, cursor, orderBy, query, includeArchived, createdAt, updatedAt)
+- `get_team` (query) — required: query
+- `list_users` (limit, cursor, orderBy, query, team)
+- `get_user` (query) — required: query
+- `search_documentation` (query, page) — required: query
+- `list_initiatives` (limit, cursor, orderBy, query, status, owner, parentInitiative, label, createdAt, updatedAt, includeArchived, includeProjects, includeSubInitiatives, fields)
+- `get_initiative` (query, includeProjects, includeSubInitiatives) — required: query
+- `save_initiative` (id, name, summary, description, color, icon, status, priority, targetDate, owner, parentInitiatives, labels)
+- `list_initiative_labels` (limit, cursor, orderBy, name)
+- `create_initiative_label` (name, description, color, parent, isGroup) — required: name
+- `get_status_updates` (limit, cursor, orderBy, type, id, project, initiative, user, createdAt, updatedAt, includeArchived) — required: type
+- `save_status_update` (type, id, project, initiative, body, health, isDiffHidden) — required: type
+- `delete_status_update` (type, id) — required: type, id

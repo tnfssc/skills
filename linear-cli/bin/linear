@@ -1,0 +1,439 @@
+#!/usr/bin/env bash
+# linear — standalone Linear CLI backed by mcpc (mcp.linear.app/mcp).
+#
+# A persistent mcpc session (@linear) carries an OAuth'd connection to Linear's
+# hosted MCP server; this script maps friendly subcommands onto its tools and
+# unwraps the MCP envelope so stdout is plain JSON you can pipe to jq.
+#
+#   linear setup                 # one-time OAuth login + session connect
+#   linear issue list -a me      # my issues
+#   linear issue view ENG-123
+#   linear call <tool> k:=v ...  # raw passthrough for the other ~50 tools
+#
+# Run `linear help` for the full command list. Targets macOS system bash 3.2.
+set -uo pipefail
+
+SESSION=${LINEAR_SESSION:-@linear}
+SERVER=${LINEAR_SERVER:-mcp.linear.app/mcp}
+TIMEOUT=${LINEAR_TIMEOUT:-120}
+RAW=0      # --raw: print unwrapped text without jq pretty-printing
+COMPACT=0  # -c: jq -c
+
+die() { echo "linear: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null || die "'$1' is required but not installed"; }
+need mcpc; need jq
+
+ERRF=$(mktemp)
+trap 'rm -f "$ERRF"' EXIT
+
+# ---------- argument object ----------
+ARGS='{}'
+arg_str() { ARGS=$(jq --arg k "$1" --arg v "$2" '.[$k]=$v' <<<"$ARGS"); }
+arg_raw() { ARGS=$(jq --arg k "$1" --argjson v "$2" '.[$k]=$v' <<<"$ARGS"); } # num/bool/array/null
+arg_csv() { ARGS=$(jq --arg k "$1" --arg v "$2" '.[$k]=($v | split(","))' <<<"$ARGS"); }
+
+# ---------- session plumbing ----------
+heal() { mcpc restart "$SESSION" >/dev/null 2>&1 || mcpc connect "$SERVER" "$SESSION" >/dev/null 2>&1; }
+
+render() { # unwrap MCP envelope -> text; pretty-print when it's JSON
+  local text
+  text=$(jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")')
+  [ -z "$text" ] && return 0
+  if [ "$RAW" = 1 ]; then printf '%s\n' "$text"; return; fi
+  if [ "$COMPACT" = 1 ]; then printf '%s\n' "$text" | jq -c . 2>/dev/null || printf '%s\n' "$text"
+  else printf '%s\n' "$text" | jq . 2>/dev/null || printf '%s\n' "$text"; fi
+}
+
+invoke() { # invoke TOOL — args come from $ARGS
+  local tool=$1 raw rc
+  raw=$(printf '%s' "$ARGS" | mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" 2>"$ERRF") && rc=0 || rc=$?
+  # 1=client (incl. unknown session) 3=network 4=auth -> heal + retry once.
+  # 2=server/tool error is NOT retried (a rejected write must not be re-sent).
+  if [ "$rc" = 1 ] || [ "$rc" = 3 ] || [ "$rc" = 4 ]; then
+    heal
+    raw=$(printf '%s' "$ARGS" | mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" 2>"$ERRF") && rc=0 || rc=$?
+  fi
+  if [ "$rc" != 0 ]; then
+    cat "$ERRF" >&2
+    [ "$rc" = 4 ] && echo "linear: auth failed — run 'linear setup'" >&2
+    return "$rc"
+  fi
+  if jq -e '.isError == true' <<<"$raw" >/dev/null 2>&1; then
+    jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' <<<"$raw" >&2
+    return 2
+  fi
+  render <<<"$raw"
+}
+
+resolve_team_id() { # cycles wants a team UUID; accept a name/key and resolve it
+  local q=$1
+  case "$q" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*) echo "$q"; return ;;
+  esac
+  ARGS='{}'; arg_str query "$q"
+  RAW=1 invoke get_team | jq -re 'if type=="object" then (.team.id // .id) else empty end' \
+    || die "could not resolve team '$q'"
+}
+
+body_from_flags() { # -b/--body VALUE | --body-file F ('-' = stdin); no implicit stdin
+  if [ -n "${BODY_FILE:-}" ]; then
+    if [ "$BODY_FILE" = - ]; then cat; else cat "$BODY_FILE"; fi
+  elif [ -n "${BODY:-}" ]; then printf '%s' "$BODY"
+  else return 1; fi
+}
+
+priority_num() {
+  local p
+  p=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case "$p" in
+    none|0) echo 0 ;; urgent|1) echo 1 ;; high|2) echo 2 ;;
+    medium|3) echo 3 ;; low|4) echo 4 ;;
+    *) die "invalid priority '$1' (none|urgent|high|medium|low or 0-4)" ;;
+  esac
+}
+
+# ---------- shared issue field flags (create/update) ----------
+parse_issue_fields() { # consumes flags, fills $ARGS; unknown args are an error
+  BODY=""; BODY_FILE=""
+  local url title b
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --title)        arg_str title "$2"; shift 2 ;;
+      -b|--body|--description) BODY=$2; shift 2 ;;
+      --body-file)    BODY_FILE=$2; shift 2 ;;
+      -t|--team)      arg_str team "$2"; shift 2 ;;
+      -p|--project)   arg_str project "$2"; shift 2 ;;
+      -s|--state)     arg_str state "$2"; shift 2 ;;
+      -a|--assignee)  arg_str assignee "$2"; shift 2 ;;
+      --no-assignee)  arg_raw assignee null; shift ;;
+      --delegate)     arg_str delegate "$2"; shift 2 ;;
+      --priority)     arg_raw priority "$(priority_num "$2")"; shift 2 ;;
+      --labels)       arg_csv labels "$2"; shift 2 ;;
+      --parent)       arg_str parentId "$2"; shift 2 ;;
+      --due)          arg_str dueDate "$2"; shift 2 ;;
+      --estimate)     arg_raw estimate "$2"; shift 2 ;;
+      --cycle)        arg_str cycle "$2"; shift 2 ;;
+      --milestone)    arg_str milestone "$2"; shift 2 ;;
+      --blocks)       arg_csv blocks "$2"; shift 2 ;;
+      --blocked-by)   arg_csv blockedBy "$2"; shift 2 ;;
+      --related)      arg_csv relatedTo "$2"; shift 2 ;;
+      --dup-of)       arg_str duplicateOf "$2"; shift 2 ;;
+      --link)         # repeatable: --link 'https://…|Title'
+                      url=${2%%|*}; title=${2#*|}
+                      ARGS=$(jq --arg u "$url" --arg t "$title" '.links += [{url:$u,title:$t}]' <<<"$ARGS"); shift 2 ;;
+      *)              die "unknown flag '$1'" ;;
+    esac
+  done
+  if b=$(body_from_flags); then arg_str description "$b"; fi
+  return 0
+}
+
+# ---------- generic list filter flags ----------
+# consumes limit/cursor/order/etc.; unrecognized args accumulate in LEFTOVER
+parse_list_flags() {
+  LEFTOVER=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -n|--limit)      arg_raw limit "$2"; shift 2 ;;
+      --cursor)        arg_str cursor "$2"; shift 2 ;;
+      --order)         arg_str orderBy "$2"; shift 2 ;;
+      --fields)        arg_csv fields "$2"; shift 2 ;;
+      --updated-after) arg_str updatedAt "$2"; shift 2 ;;
+      --created-after) arg_str createdAt "$2"; shift 2 ;;
+      --no-archived)   arg_raw includeArchived false; shift ;;
+      *)               LEFTOVER+=("$1"); shift ;;
+    esac
+  done
+}
+
+usage() {
+  cat <<'EOF'
+linear — Linear CLI (mcpc-backed). Output is JSON on stdout; pipe to jq.
+
+session:
+  linear setup                          one-time OAuth login + connect
+  linear status                         session state
+  linear tools [pattern]                list/search available MCP tools
+  linear call TOOL [k:=v ...]           raw tool passthrough (mcpc arg syntax)
+
+issues:
+  linear issue view ID [--relations] [--releases] [--needs]
+  linear issue list [-a me|USER|null] [-t TEAM] [-s STATE] [-p PROJECT]
+                    [-q QUERY] [--label L] [--priority P] [--cycle C]
+                    [--parent ID] [-n LIMIT] [--cursor C] [--fields a,b]
+                    [--updated-after -P1D] [--no-archived]
+  linear issue create -t TEAM --title T [-b BODY|--body-file F] [field flags]
+  linear issue update ID [field flags]        (--state Done, -a me, ...)
+  linear issue comment ID (-b BODY|--body-file F|--body-file -) [--reply-to COMMENT]
+  linear issue comments ID
+  linear issue open ID                  open in browser
+
+  field flags: --title -b/--body --body-file(- = stdin) -t/--team -p/--project
+               -s/--state -a/--assignee --no-assignee --delegate --priority
+               --labels a,b --parent --due --estimate --cycle --milestone
+               --link 'url|Title' --blocks --blocked-by --related --dup-of
+
+workspace:
+  linear teams [-q QUERY]               linear team QUERY
+  linear projects [-q Q] [-t TEAM] [--member me] [-s STATE]
+  linear project QUERY [--milestones] [--members] [--resources]
+  linear milestones PROJECT
+  linear users [-q Q] [-t TEAM]         linear user QUERY | linear me
+  linear cycles TEAM [--type current|previous|next|all]
+  linear statuses TEAM
+  linear labels [-t TEAM] [--name N]
+  linear docs [-q Q] [-p PROJECT_ID] [-t TEAM_ID]     linear doc ID
+  linear updates [--type project|initiative] [-p PROJECT] [--user me]
+  linear search-docs QUERY              search Linear's product documentation
+
+global flags (anywhere): --raw  -c/--compact  --timeout N  --session @name
+env: LINEAR_SESSION (@linear)  LINEAR_SERVER  LINEAR_TIMEOUT
+EOF
+}
+
+# ---------- strip global flags anywhere in argv ----------
+POSARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --raw) RAW=1; shift ;;
+    -c|--compact) COMPACT=1; shift ;;
+    --timeout) TIMEOUT=$2; shift 2 ;;
+    --session) SESSION=$2; shift 2 ;;
+    *) POSARGS+=("$1"); shift ;;
+  esac
+done
+set -- ${POSARGS[@]+"${POSARGS[@]}"}
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  help|-h|--help) usage ;;
+
+  setup)
+    mcpc login "$SERVER" &&
+    { mcpc connect "$SERVER" "$SESSION" 2>/dev/null || mcpc restart "$SESSION"; } &&
+    mcpc "$SESSION" ping && echo "linear: ready" ;;
+
+  status) mcpc "$SESSION" ;;
+
+  tools)
+    if [ -n "${1:-}" ]; then mcpc "$SESSION" grep "$1" --tools
+    else mcpc "$SESSION" tools-list; fi ;;
+
+  call)
+    [ -n "${1:-}" ] || die "usage: linear call TOOL [k:=v ...]"
+    tool=$1; shift
+    raw=$(mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" "$@" 2>"$ERRF") && rc=0 || rc=$?
+    if [ "$rc" = 1 ] || [ "$rc" = 3 ] || [ "$rc" = 4 ]; then
+      heal
+      raw=$(mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" "$@" 2>"$ERRF") && rc=0 || rc=$?
+    fi
+    if [ "$rc" != 0 ]; then cat "$ERRF" >&2; exit "$rc"; fi
+    render <<<"$raw" ;;
+
+  issue)
+    sub=${1:-}
+    [ $# -gt 0 ] && shift
+    case "$sub" in
+      view)
+        id=${1:?usage: linear issue view ID}; shift
+        arg_str id "$id"
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --relations) arg_raw includeRelations true ;;
+            --releases)  arg_raw includeReleases true ;;
+            --needs)     arg_raw includeCustomerNeeds true ;;
+            *) die "unknown flag '$1'" ;;
+          esac; shift
+        done
+        invoke get_issue ;;
+      list)
+        parse_list_flags ${1+"$@"}
+        set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -a|--assignee) if [ "$2" = null ]; then arg_raw assignee null; else arg_str assignee "$2"; fi; shift 2 ;;
+            -t|--team)     arg_str team "$2"; shift 2 ;;
+            -s|--state)    arg_str state "$2"; shift 2 ;;
+            -p|--project)  arg_str project "$2"; shift 2 ;;
+            -q|--query)    arg_str query "$2"; shift 2 ;;
+            --label)       arg_str label "$2"; shift 2 ;;
+            --cycle)       arg_str cycle "$2"; shift 2 ;;
+            --release)     arg_str release "$2"; shift 2 ;;
+            --parent)      arg_str parentId "$2"; shift 2 ;;
+            --delegate)    arg_str delegate "$2"; shift 2 ;;
+            --priority)    arg_raw priority "$(priority_num "$2")"; shift 2 ;;
+            *) die "unknown flag '$1'" ;;
+          esac
+        done
+        invoke list_issues ;;
+      create)
+        parse_issue_fields ${1+"$@"}
+        jq -e '.title and .team' <<<"$ARGS" >/dev/null || die "create requires --title and -t/--team"
+        invoke save_issue ;;
+      update)
+        id=${1:?usage: linear issue update ID [field flags]}; shift
+        arg_str id "$id"
+        parse_issue_fields ${1+"$@"}
+        [ "$(jq 'keys | length' <<<"$ARGS")" -gt 1 ] || die "nothing to update — pass field flags"
+        invoke save_issue ;;
+      comment)
+        id=${1:?usage: linear issue comment ID (-b BODY|--body-file F|--body-file -)}; shift
+        BODY=""; BODY_FILE=""
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -b|--body)   BODY=$2; shift 2 ;;
+            --body-file) BODY_FILE=$2; shift 2 ;;
+            --reply-to)  arg_str parentId "$2"; shift 2 ;;
+            *) die "unknown flag '$1'" ;;
+          esac
+        done
+        b=$(body_from_flags) || die "comment body required (-b BODY, --body-file F, or --body-file - for stdin)"
+        [ -n "$b" ] || die "refusing to post an empty comment"
+        arg_str issueId "$id"; arg_str body "$b"
+        invoke save_comment ;;
+      comments)
+        id=${1:?usage: linear issue comments ID}; shift
+        arg_str issueId "$id"
+        parse_list_flags ${1+"$@"}
+        [ "${#LEFTOVER[@]}" -eq 0 ] 2>/dev/null || [ -z "${LEFTOVER[*]:-}" ] || die "unexpected args: ${LEFTOVER[*]}"
+        invoke list_comments ;;
+      open)
+        id=${1:?usage: linear issue open ID}
+        arg_str id "$id"
+        url=$(RAW=1 invoke get_issue | jq -re '.url // .issue.url') || die "no URL found for $id"
+        if command -v open >/dev/null; then open "$url"
+        elif command -v xdg-open >/dev/null; then xdg-open "$url"
+        else echo "$url"; fi ;;
+      *) die "usage: linear issue view|list|create|update|comment|comments|open" ;;
+    esac ;;
+
+  teams)
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -q|--query) arg_str query "$2"; shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke list_teams ;;
+  team)
+    arg_str query "${1:?usage: linear team QUERY}"
+    invoke get_team ;;
+
+  projects)
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -q|--query)   arg_str query "$2"; shift 2 ;;
+        -t|--team)    arg_str team "$2"; shift 2 ;;
+        -s|--state)   arg_str state "$2"; shift 2 ;;
+        --member)     arg_str member "$2"; shift 2 ;;
+        --label)      arg_str label "$2"; shift 2 ;;
+        --initiative) arg_str initiative "$2"; shift 2 ;;
+        --milestones) arg_raw includeMilestones true; shift; continue ;;
+        --members)    arg_raw includeMembers true; shift; continue ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke list_projects ;;
+  project)
+    arg_str query "${1:?usage: linear project QUERY}"
+    [ $# -gt 0 ] && shift
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --milestones) arg_raw includeMilestones true ;;
+        --members)    arg_raw includeMembers true ;;
+        --resources)  arg_raw includeResources true ;;
+        *) die "unknown flag '$1'" ;;
+      esac; shift
+    done
+    invoke get_project ;;
+
+  milestones)
+    arg_str project "${1:?usage: linear milestones PROJECT}"
+    invoke list_milestones ;;
+
+  users)
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -q|--query) arg_str query "$2"; shift 2 ;;
+        -t|--team)  arg_str team "$2"; shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke list_users ;;
+  user)
+    arg_str query "${1:?usage: linear user QUERY}"
+    invoke get_user ;;
+  me|whoami)
+    arg_str query me
+    invoke get_user ;;
+
+  cycles)
+    team=${1:?usage: linear cycles TEAM [--type current|previous|next|all]}
+    shift
+    tid=$(resolve_team_id "$team") || exit 1
+    arg_str teamId "$tid"
+    [ "${1:-}" = --type ] && arg_str type "${2:?--type needs a value}"
+    invoke list_cycles ;;
+
+  statuses)
+    arg_str team "${1:?usage: linear statuses TEAM}"
+    invoke list_issue_statuses ;;
+
+  labels)
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -t|--team) arg_str team "$2"; shift 2 ;;
+        --name)    arg_str name "$2"; shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke list_issue_labels ;;
+
+  docs)
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -q|--query)   arg_str query "$2"; shift 2 ;;
+        -p|--project) arg_str projectId "$2"; shift 2 ;;
+        -t|--team)    arg_str teamId "$2"; shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke list_documents ;;
+  doc)
+    arg_str id "${1:?usage: linear doc ID}"
+    invoke get_document ;;
+
+  updates)
+    arg_str type project  # default; override with --type initiative
+    parse_list_flags ${1+"$@"}
+    set -- ${LEFTOVER[@]+"${LEFTOVER[@]}"}
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --type)       arg_str type "$2"; shift 2 ;;
+        -p|--project) arg_str project "$2"; shift 2 ;;
+        --initiative) arg_str initiative "$2"; shift 2 ;;
+        --user)       arg_str user "$2"; shift 2 ;;
+        --id)         arg_str id "$2"; shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    invoke get_status_updates ;;
+
+  search-docs)
+    arg_str query "${1:?usage: linear search-docs QUERY}"
+    invoke search_documentation ;;
+
+  *) die "unknown command '$cmd' — run 'linear help'" ;;
+esac

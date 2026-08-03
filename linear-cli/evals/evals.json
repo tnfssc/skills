@@ -1,0 +1,54 @@
+{
+  "skill_name": "linear-cli",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Show me my in-progress Linear issues as a small table with id, status, priority, and title.",
+      "expected_output": "Uses linear issue list with assignee me and a started/In Progress state filter, uses --fields to limit output, pipes JSON to jq or formats it into a table, and explains the result.",
+      "files": [],
+      "assertions": [
+        "Output includes a linear issue list command",
+        "Command filters assignee to the current user with -a me",
+        "Command filters to started/In Progress state",
+        "Command uses --fields or jq to select id/status/priority/title",
+        "Response presents the results as a readable table or list"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Create a bug in the Engineering team titled 'Checkout page hangs on coupon apply'. Body: Steps: open checkout, enter SAVE10, click Apply. Expected: discount appears. Actual: spinner never stops. Priority high, labels checkout and regression.",
+      "expected_output": "Recognizes this as a write, shows a linear issue create command with -t Engineering, the title, a multi-line Markdown body via --body-file or -b with real newlines, --priority high and --labels checkout,regression, and asks for confirmation before running unless told to run now.",
+      "files": [],
+      "assertions": [
+        "Output treats issue creation as a write operation requiring confirmation",
+        "Command uses linear issue create with -t Engineering and the requested title",
+        "Command sets --priority high and --labels with both labels",
+        "Command preserves the multiline body accurately (body-file or literal newlines)",
+        "Response notes --labels replaces the full label set only on update, or otherwise handles labels correctly"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Append a '## Rollout plan' section to the description of issue ENG-123 in Linear without touching the rest of the description.",
+      "expected_output": "Uses the patch mechanism via linear call save_issue with an append (or insert_after) op rather than rewriting the whole description with -b.",
+      "files": [],
+      "assertions": [
+        "Output does not rewrite the full description with -b/--body-file",
+        "Command uses linear call save_issue with a patch array",
+        "Patch uses append or an anchor-based insert op",
+        "Command targets id ENG-123"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Which Linear MCP tools deal with releases, and how would I list release pipelines from the shell?",
+      "expected_output": "Uses linear tools release (or the tools.md catalog) for discovery and shows linear call list_release_pipelines, mentioning mcpc @linear tools-get for schemas.",
+      "files": [],
+      "assertions": [
+        "Output uses linear tools or the catalog reference for discovery",
+        "Output shows a linear call list_release_pipelines command",
+        "Output mentions checking the tool schema before raw calls"
+      ]
+    }
+  ]
+}

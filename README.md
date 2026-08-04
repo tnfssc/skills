@@ -30,15 +30,22 @@ mkdir -p ~/.agents/skills
 for d in ~/.tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] && ln -sfn "$d" ~/.agents/skills/; done
 ```
 
-Project-local — same loop using `.tnfssc-skills` and `.agents/skills` in the current project. Update later with `git pull -C ~/.tnfssc-skills` (symlinks stay live). Remove with `rm -rf ~/.tnfssc-skills` plus `rm ~/.agents/skills/cua-driver ~/.agents/skills/host-sharath …`.
+Project-local — same loop using `.tnfssc-skills` and `.agents/skills` in the current project. Remove with `rm -rf ~/.tnfssc-skills` plus `rm ~/.agents/skills/cua-driver ~/.agents/skills/host-sharath …`.
 
 If the skills dir is empty/dedicated, you can skip symlinking and clone directly: `git clone https://github.com/tnfssc/skills.git ~/.agents/skills`.
+
+## Update
+
+```sh
+git -C ~/.tnfssc-skills pull --ff-only
+```
 
 ## Skills
 
 | Skill | Description | Source |
 |-------|-------------|--------|
 | [cua-driver](cua-driver/) | Drive native GUI apps (snapshot AX tree, click/type/scroll, verify) via the cua-driver CLI/MCP | [trycua/cua](https://github.com/trycua/cua) |
+| [gcx](gcx/) | Manage Grafana Cloud resources through the unified `gcx` CLI | [grafana/gcx](https://github.com/grafana/gcx) |
 | [hallmark](hallmark/) | Design and audit interfaces with an anti-AI-slop visual discipline | [nutlope/hallmark](https://github.com/nutlope/hallmark) |
 | [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |
 | [jira-cli](jira-cli/) | Work with Jira issues, sprints, boards, projects, and JQL using the `jira` CLI | Local zip |

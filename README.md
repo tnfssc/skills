@@ -8,7 +8,7 @@
 
 ## Install
 
-Agent skill loaders (opencode, Claude Code, …) auto-discover **one level deep**: `<skills-dir>/<name>/SKILL.md`. So each skill folder must sit directly under `~/.agents/skills/` (or `.agents/skills/`), not nested under a namespace.
+Agent skill loaders auto-discover **one level deep**: `<skills-dir>/<name>/SKILL.md`. Skills are linked into both `~/.agents/skills/` for Agent Skills-compatible tools and `~/.claude/skills/` for Claude Code.
 
 **Clone + symlink each skill in** (safe when the skills dir is already populated — adds these skills without touching others).
 
@@ -16,9 +16,12 @@ Fish:
 
 ```fish
 git clone https://github.com/tnfssc/skills.git ~/.tnfssc-skills
-mkdir -p ~/.agents/skills
+mkdir -p ~/.agents/skills ~/.claude/skills
 for d in ~/.tnfssc-skills/*/
-    test -f "$d/SKILL.md"; and ln -sfn "$d" ~/.agents/skills/
+    if test -f "$d/SKILL.md"
+        ln -sfn "$d" ~/.agents/skills/
+        ln -sfn "$d" ~/.claude/skills/
+    end
 end
 ```
 
@@ -26,18 +29,16 @@ Bash/POSIX:
 
 ```sh
 git clone https://github.com/tnfssc/skills.git ~/.tnfssc-skills
-mkdir -p ~/.agents/skills
-for d in ~/.tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] && ln -sfn "$d" ~/.agents/skills/; done
+mkdir -p ~/.agents/skills ~/.claude/skills
+for d in ~/.tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] || continue; ln -sfn "$d" ~/.agents/skills/; ln -sfn "$d" ~/.claude/skills/; done
 ```
 
-Project-local — same loop using `.tnfssc-skills` and `.agents/skills` in the current project. Remove with `rm -rf ~/.tnfssc-skills` plus `rm ~/.agents/skills/cua-driver ~/.agents/skills/host-sharath …`.
-
-If the skills dir is empty/dedicated, you can skip symlinking and clone directly: `git clone https://github.com/tnfssc/skills.git ~/.agents/skills`.
+Project-local — use the same loop with `.tnfssc-skills`, `.agents/skills`, and `.claude/skills` inside the project.
 
 ## Update
 
 ```sh
-git -C ~/.tnfssc-skills pull --ff-only
+sh -c 'git -C "$HOME/.tnfssc-skills" pull --ff-only && mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" && for d in "$HOME"/.tnfssc-skills/*/; do [ -f "$d/SKILL.md" ] || continue; ln -sfn "$d" "$HOME/.agents/skills/"; ln -sfn "$d" "$HOME/.claude/skills/"; done'
 ```
 
 ## Skills

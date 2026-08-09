@@ -11,9 +11,9 @@ langfuse --help
 
 This repository does not wrap, fork, or reimplement the CLI.
 
-## Credentials
+## Credentials and project profiles
 
-The CLI reads `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and the host from either `LANGFUSE_HOST` or `LANGFUSE_BASE_URL`. This machine keeps them in `~/.config/langfuse/env`, mode `600`, loaded with `--env`:
+Langfuse API keys are project-scoped. Keep one mode-`600` env file per project under `~/.config/langfuse/`; use `env` for the default and `env.<short-project-slug>` for additional projects. The CLI reads `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and the host from either `LANGFUSE_HOST` or `LANGFUSE_BASE_URL`:
 
 ```dotenv
 LANGFUSE_PUBLIC_KEY=pk-lf-XXXX
@@ -24,9 +24,18 @@ LANGFUSE_BASE_URL=https://langfuse.example.com
 
 Both host names are set because the CLI takes either while the Langfuse SDKs read `LANGFUSE_BASE_URL` — so the same file works when sourced for application code.
 
+The machine-local profile registry lives at `~/.config/langfuse/profiles.md`. Use it to map a Langfuse URL's `/project/<id>/` to the correct env file.
+
+### Adding a project profile
+
+1. Obtain that project's API key pair from Settings → API Keys; ask the user to provide it.
+2. Verify once with `LANGFUSE_PUBLIC_KEY=… LANGFUSE_SECRET_KEY=… LANGFUSE_HOST=… langfuse api projects get-public`; confirm the returned project ID matches.
+3. Write `~/.config/langfuse/env.<short-slug>` in the standard four-variable format above and set mode `600`.
+4. Register the profile, project name, project ID, and env file in `~/.config/langfuse/profiles.md`.
+
 ```bash
 langfuse --env ~/.config/langfuse/env api __schema
-langfuse --env ~/.config/langfuse/env api traces list --limit 5 --json
+langfuse --env ~/.config/langfuse/env.<slug> api traces list --limit 5 --json
 ```
 
 Keys are project-scoped and come from the project's Settings → API Keys. Never commit the env file, paste secret keys into chat, or pass keys as command-line flags. Rotate compromised keys in project settings.

@@ -33,7 +33,7 @@ Keys are project-scoped and come from the project's Settings → API Keys. Never
 
 ## Vendored upstream skill
 
-`SKILL.md` and every `references/*.md` except this file are copies of `skills/langfuse/` from [langfuse/skills](https://github.com/langfuse/skills) at commit `b9958d6c7b0df35a7f1df76a5f6c3a4505b0a3d3`, vendored 2026-08-09 with only trailing whitespace normalized.
+This skill vendors `skills/langfuse/` from [langfuse/skills](https://github.com/langfuse/skills) at commit `b9958d6c7b0df35a7f1df76a5f6c3a4505b0a3d3`, installed 2026-08-09. Upstream references are unchanged except normalized trailing whitespace; `SKILL.md` adds local frontmatter and the "Local setup" section above the upstream body; this setup file is local-only.
 
 To refresh: diff that directory at a newer upstream commit, take the upstream content as-is, keep the local frontmatter and "Local setup" section in `SKILL.md`, and record the new commit here. `langfuse get-skill` prints upstream's current `SKILL.md` from `main`, which is a quick drift check but does not cover the references.
 

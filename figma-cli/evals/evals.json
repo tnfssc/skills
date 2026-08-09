@@ -20,7 +20,7 @@
       "expected_output": "Uses figma nodes with file key, node ID, and --depth 2, then reads returned JSON without fetching whole file.",
       "files": [],
       "assertions": [
-        "Command uses figma nodes AbCdEf123456 4:56",
+        "Command uses figma nodes with file key AbCdEf123456 and node 4:56 (or 4-56)",
         "Command uses --depth 2",
         "Response avoids full-file fetch",
         "Response summarizes observable node data"

@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# figma — standalone Figma REST API CLI.
-# Targets macOS system bash 3.2.
+# figma — standalone Figma REST API CLI (api.figma.com).
+#
+# A personal access token from $FIGMA_TOKEN or ~/.config/figma/token is sent as
+# X-Figma-Token; each subcommand is a thin curl call whose JSON body lands on
+# stdout for jq. Figma URLs are accepted anywhere a file key is, and a URL's
+# node-id=1-23 is normalized to the REST form 1:23.
+#
+#   figma setup figd_XXXX                    # store + verify a token
+#   figma file https://figma.com/design/KEY  # document JSON
+#   figma screenshot URL -o frame.png        # render a node to a file
+#   figma api GET /v1/files/KEY depth=2      # raw passthrough for everything else
+#
+# Run `figma help` for the full command list. Targets macOS system bash 3.2.
 set -uo pipefail
 
 BASE_URL=${FIGMA_BASE_URL:-https://api.figma.com}
@@ -9,7 +20,8 @@ TOKEN_FILE=${FIGMA_TOKEN_FILE:-"$HOME/.config/figma/token"}
 RAW=0
 COMPACT=0
 
-die() { echo "figma: $*" >&2; exit 1; }
+warn() { echo "figma: $*" >&2; }
+die() { warn "$*"; exit 1; }
 need() { command -v "$1" >/dev/null || die "'$1' is required but not installed"; }
 need curl; need jq
 
@@ -33,8 +45,8 @@ render_file() {
 api_request() { # METHOD PATH [query k=v ...]; request body comes from API_BODY
   local method=$1 path=$2 tok status rc key value
   shift 2
-  tok=$(token) || { echo "figma: no token — run 'figma setup' or set FIGMA_TOKEN" >&2; return 4; }
-  [ -n "$tok" ] || { echo "figma: empty token — run 'figma setup'" >&2; return 4; }
+  tok=$(token) || { warn "no token — run 'figma setup' or set FIGMA_TOKEN"; return 4; }
+  [ -n "$tok" ] || { warn "empty token — run 'figma setup'"; return 4; }
 
   local curl_args
   curl_args=(--silent --show-error --connect-timeout 15 --max-time "$TIMEOUT"
@@ -45,71 +57,74 @@ api_request() { # METHOD PATH [query k=v ...]; request body comes from API_BODY
     while [ $# -gt 0 ]; do
       case "$1" in
         *=*) key=${1%%=*}; value=${1#*=}; curl_args+=(--data-urlencode "$key=$value") ;;
-        *) echo "figma: query must be k=v, got '$1'" >&2; return 1 ;;
+        *) warn "query must be k=v, got '$1'"; return 1 ;;
       esac
       shift
     done
   else
     curl_args+=(--header 'Content-Type: application/json')
     [ -z "${API_BODY:-}" ] || curl_args+=(--data-binary "$API_BODY")
-    [ $# -eq 0 ] || { echo "figma: unexpected arguments after request body: $*" >&2; return 1; }
+    [ $# -eq 0 ] || { warn "unexpected arguments after request body: $*"; return 1; }
   fi
 
   status=$(curl "${curl_args[@]}" "$BASE_URL$path" 2>"$TMP_ERR") && rc=0 || rc=$?
   if [ "$rc" != 0 ]; then
     cat "$TMP_ERR" >&2
-    echo "figma: network error (curl $rc)" >&2
+    warn "network error (curl $rc)"
     return 3
   fi
   case "$status" in
     2??) render_file "$TMP_BODY" ;;
     401)
       jq -r '.message // .err // .error // empty' "$TMP_BODY" 2>/dev/null >&2 || true
-      echo "figma: authentication failed — run 'figma setup'" >&2
+      warn "authentication failed — run 'figma setup'"
       return 4 ;;
     403)
+      # Figma answers 403 both for a bad token and for a gated endpoint; only the
+      # former is worth sending the user back to `figma setup`.
       if [ "$path" = /v1/me ] || jq -er '((.message // .err // "") | test("token|authentic"; "i"))' "$TMP_BODY" >/dev/null 2>&1; then
         jq -r '.message // .err // .error // empty' "$TMP_BODY" 2>/dev/null >&2 || true
-        echo "figma: authentication failed — run 'figma setup'" >&2
+        warn "authentication failed — run 'figma setup'"
         return 4
       fi
       jq -r '.message // .err // .error // "HTTP 403"' "$TMP_BODY" 2>/dev/null >&2 || cat "$TMP_BODY" >&2
-      echo "figma: API request forbidden; endpoint may be plan-, scope-, or permission-gated" >&2
+      warn "API request forbidden; endpoint may be plan-, scope-, or permission-gated"
       return 2 ;;
     *)
       jq -r '.message // .err // .error // empty' "$TMP_BODY" 2>/dev/null >&2 || cat "$TMP_BODY" >&2
-      echo "figma: API error HTTP $status ($method $path)" >&2
+      warn "API error HTTP $status ($method $path)"
       return 2 ;;
   esac
 }
 
-file_key() {
+# These run inside $(...), so they report failure by return code — an exit here
+# would only kill the subshell and let the caller run on with an empty value.
+file_key() { # Figma URL -> file key; a bare key passes through unchanged
   local input=$1 key
   case "$input" in
     http://*|https://*)
-      key=$(printf '%s' "$input" | sed -E 's#^https?://(www\.)?figma\.com/(design|file|board|proto|make)/([^/?#]+).*$#\3#')
-      [ "$key" != "$input" ] || die "could not parse Figma file key from URL"
+      key=$(printf '%s' "$input" | sed -E 's#^https?://(www\.)?figma\.com/(design|file|board|proto|slides|make)/([^/?#]+).*$#\3#')
+      [ "$key" != "$input" ] || { warn "could not parse a Figma file key from '$input'"; return 1; }
       printf '%s' "$key" ;;
     *) printf '%s' "$input" ;;
   esac
 }
 
-url_node_id() {
+normalize_node_id() { # URL form 1-23 -> REST form 1:23
+  case "$1" in *:*) printf '%s' "$1" ;; *-*) printf '%s' "$1" | sed 's/-/:/' ;; *) printf '%s' "$1" ;; esac
+}
+
+url_node_id() { # ...?node-id=1-23 -> 1:23; fails when the URL carries no node
   local input=$1 node
   case "$input" in
     *[?\&]node-id=*)
       node=$(printf '%s' "$input" | sed -E 's/.*[?&]node-id=([^&#]+).*/\1/' | sed 's/%3A/:/Ig')
-      case "$node" in *:*) ;; *-*) node=$(printf '%s' "$node" | sed 's/-/:/') ;; esac
-      printf '%s' "$node" ;;
+      normalize_node_id "$node" ;;
     *) return 1 ;;
   esac
 }
 
-normalize_node_id() {
-  case "$1" in *:*) printf '%s' "$1" ;; *-*) printf '%s' "$1" | sed 's/-/:/' ;; *) printf '%s' "$1" ;; esac
-}
-
-join_csv() {
+join_csv() { # node IDs -> the normalized comma list the ?ids= query wants
   local out="" value
   while [ $# -gt 0 ]; do
     value=$(normalize_node_id "$1")
@@ -128,11 +143,11 @@ auth:
   figma me                                    current user
 
 files:
-  figma file URL|KEY [--depth N] [--geometry] [--version ID] [--meta]
-  figma nodes URL|KEY [NODE_ID ...] [--depth N] [--geometry]
+  figma file URL|KEY [--depth N] [--geometry] [--version ID] [--branches] [--meta]
+  figma nodes URL|KEY [NODE_ID ...] [--depth N] [--geometry] [--version ID]
   figma screenshot URL|KEY [NODE_ID] [-o FILE] [--format png|jpg|svg|pdf] [--scale N]
   figma comments URL|KEY
-  figma comment URL|KEY TEXT [--node NODE_ID]  post comment (write)
+  figma comment URL|KEY TEXT [--node NODE_ID] post a comment (write)
   figma versions URL|KEY [--page URL]
   figma components URL|KEY                    published file components
   figma styles URL|KEY                        published file styles
@@ -175,17 +190,18 @@ case "$cmd" in
     else die "usage: figma setup TOKEN (or pipe token on stdin)"
     fi
     [ -n "$candidate" ] || die "refusing empty token"
-    old_token=${FIGMA_TOKEN-}; had_token=${FIGMA_TOKEN+x}; FIGMA_TOKEN=$candidate
+    FIGMA_TOKEN=$candidate
     RAW=1 api_request GET /v1/me >/dev/null || exit $?
-    if [ -n "$had_token" ]; then FIGMA_TOKEN=$old_token; else unset FIGMA_TOKEN; fi
     mkdir -p "$(dirname "$TOKEN_FILE")"
-    umask 077
+    umask 077                     # so a fresh token file is never briefly world-readable
     printf '%s\n' "$candidate" >"$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"       # and an existing one is tightened too
     echo "figma: token stored in $TOKEN_FILE; ready" ;;
   me) api_request GET /v1/me ;;
   file)
-    target=${1:?usage: figma file URL|KEY [flags]}; shift; key=$(file_key "$target"); path="/v1/files/$key"; query=()
+    target=${1:?usage: figma file URL|KEY [flags]}; shift
+    key=$(file_key "$target") || exit 1
+    path="/v1/files/$key"; query=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --depth) query+=("depth=${2:?--depth needs value}"); shift 2 ;;
@@ -198,7 +214,9 @@ case "$cmd" in
     done
     api_request GET "$path" ${query[@]+"${query[@]}"} ;;
   nodes)
-    target=${1:?usage: figma nodes URL|KEY [NODE_ID ...]}; shift; key=$(file_key "$target"); ids=(); query=()
+    target=${1:?usage: figma nodes URL|KEY [NODE_ID ...]}; shift
+    key=$(file_key "$target") || exit 1
+    ids=(); query=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --depth) query+=("depth=${2:?--depth needs value}"); shift 2 ;;
@@ -208,11 +226,16 @@ case "$cmd" in
         *) ids+=("$1"); shift ;;
       esac
     done
-    if [ "${#ids[@]}" -eq 0 ]; then ids+=("$(url_node_id "$target" || die "node ID required; pass NODE_ID or URL containing node-id")"); fi
+    if [ "${#ids[@]}" -eq 0 ]; then
+      node=$(url_node_id "$target") || die "node ID required — pass NODE_ID, or a URL containing node-id"
+      ids+=("$node")
+    fi
     query+=("ids=$(join_csv "${ids[@]}")")
     api_request GET "/v1/files/$key/nodes" "${query[@]}" ;;
   screenshot)
-    target=${1:?usage: figma screenshot URL|KEY [NODE_ID] [-o FILE]}; shift; key=$(file_key "$target"); node=""; format=png; scale=1; output=""
+    target=${1:?usage: figma screenshot URL|KEY [NODE_ID] [-o FILE]}; shift
+    key=$(file_key "$target") || exit 1
+    node=""; format=png; scale=1; output=""
     while [ $# -gt 0 ]; do
       case "$1" in
         -o|--output) output=${2:?--output needs file}; shift 2 ;;
@@ -223,61 +246,102 @@ case "$cmd" in
         *) [ -z "$node" ] || die "only one node can be rendered"; node=$(normalize_node_id "$1"); shift ;;
       esac
     done
-    [ -n "$node" ] || node=$(url_node_id "$target" || die "node ID required; pass NODE_ID or URL containing node-id")
+    if [ -z "$node" ]; then
+      node=$(url_node_id "$target") || die "node ID required — pass NODE_ID, or a URL containing node-id"
+    fi
     case "$format" in png|jpg|svg|pdf) ;; *) die "format must be png, jpg, svg, or pdf" ;; esac
     [ -n "$output" ] || output="figma-${node/:/-}.$format"
     [ ! -e "$output" ] || die "refusing to overwrite '$output'"
-    RAW=1 api_request GET "/v1/images/$key" "ids=$node" "format=$format" "scale=$scale" >"$TMP_ERR" || exit $?
-    image_url=$(jq -er --arg id "$node" '.images[$id] // empty' "$TMP_ERR") || die "render returned no image URL for node $node"
+    # Render URLs are short-lived, so fetch the image in the same breath.
+    render=$(RAW=1 api_request GET "/v1/images/$key" "ids=$node" "format=$format" "scale=$scale") || exit $?
+    image_url=$(jq -er --arg id "$node" '.images[$id] // empty' <<<"$render") || die "render returned no image URL for node $node"
     status=$(curl --silent --show-error --location --connect-timeout 15 --max-time "$TIMEOUT" --output "$TMP_BODY" --write-out '%{http_code}' "$image_url" 2>"$TMP_ERR") && rc=0 || rc=$?
-    if [ "$rc" != 0 ]; then cat "$TMP_ERR" >&2; echo "figma: image download network error (curl $rc)" >&2; exit 3; fi
-    case "$status" in 2??) ;; *) echo "figma: image download failed HTTP $status" >&2; exit 2 ;; esac
-    mv "$TMP_BODY" "$output"
+    if [ "$rc" != 0 ]; then cat "$TMP_ERR" >&2; warn "image download network error (curl $rc)"; exit 3; fi
+    case "$status" in 2??) ;; *) warn "image download failed HTTP $status"; exit 2 ;; esac
+    cat "$TMP_BODY" >"$output"   # not mv: keeps the file at the caller's umask, not mktemp's 0600
     printf '%s\n' "$output" ;;
   comments)
-    target=${1:?usage: figma comments URL|KEY}; key=$(file_key "$target")
+    target=${1:?usage: figma comments URL|KEY}
+    key=$(file_key "$target") || exit 1
     api_request GET "/v1/files/$key/comments" ;;
   comment)
-    target=${1:?usage: figma comment URL|KEY TEXT [--node ID]}; text=${2:?comment text required}; shift 2; key=$(file_key "$target"); node=""
-    while [ $# -gt 0 ]; do case "$1" in --node) node=$(normalize_node_id "${2:?--node needs ID}"); shift 2 ;; *) die "unknown flag '$1'" ;; esac; done
-    [ -n "$node" ] || node=$(url_node_id "$target" 2>/dev/null || true)
-    if [ -n "$node" ]; then API_BODY=$(jq -cn --arg message "$text" --arg node_id "$node" '{message:$message,client_meta:{node_id:$node_id}}')
-    else API_BODY=$(jq -cn --arg message "$text" '{message:$message}')
+    target=${1:?usage: figma comment URL|KEY TEXT [--node ID]}; text=${2:?comment text required}; shift 2
+    key=$(file_key "$target") || exit 1
+    node=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --node) node=$(normalize_node_id "${2:?--node needs ID}"); shift 2 ;;
+        *) die "unknown flag '$1'" ;;
+      esac
+    done
+    if [ -z "$node" ]; then node=$(url_node_id "$target") || node=""; fi
+    # An anchored comment needs a full FrameOffset; unanchored ones land on the file.
+    if [ -n "$node" ]; then
+      API_BODY=$(jq -cn --arg message "$text" --arg node_id "$node" \
+        '{message:$message,client_meta:{node_id:$node_id,node_offset:{x:0,y:0}}}')
+    else
+      API_BODY=$(jq -cn --arg message "$text" '{message:$message}')
     fi
     api_request POST "/v1/files/$key/comments" ;;
   versions)
-    target=${1:?usage: figma versions URL|KEY [--page URL]}; shift; key=$(file_key "$target"); path="/v1/files/$key/versions"
-    if [ "${1:-}" = --page ]; then page=${2:?--page needs URL}; path=${page#"$BASE_URL"}; fi
+    target=${1:?usage: figma versions URL|KEY [--page URL]}; shift
+    key=$(file_key "$target") || exit 1
+    path="/v1/files/$key/versions"
+    if [ "${1:-}" = --page ]; then
+      page=${2:?--page needs URL}
+      case "$page" in "$BASE_URL"/*) path=${page#"$BASE_URL"} ;; *) die "--page wants a pagination URL from a previous response" ;; esac
+    fi
     api_request GET "$path" ;;
   components|styles|variables)
-    target=${1:?usage: figma $cmd URL|KEY}; key=$(file_key "$target")
+    target=${1:?usage: figma $cmd URL|KEY}
+    key=$(file_key "$target") || exit 1
     if [ "$cmd" = variables ]; then path="/v1/files/$key/variables/local"; else path="/v1/files/$key/$cmd"; fi
     api_request GET "$path" ;;
   project)
     sub=${1:-}; [ $# -gt 0 ] && shift
     case "$sub" in
-      files) id=${1:?usage: figma project files PROJECT_ID}; shift; query=(); [ "${1:-}" = --branches ] && query+=("branch_data=true"); api_request GET "/v1/projects/$id/files" ${query[@]+"${query[@]}"} ;;
+      files)
+        id=${1:?usage: figma project files PROJECT_ID}; shift
+        query=()
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --branches) query+=("branch_data=true"); shift ;;
+            *) die "unknown flag '$1'" ;;
+          esac
+        done
+        api_request GET "/v1/projects/$id/files" ${query[@]+"${query[@]}"} ;;
       *) die "usage: figma project files PROJECT_ID [--branches]" ;;
     esac ;;
   team)
-    sub=${1:-}; [ $# -gt 0 ] && shift; id=${1:?usage: figma team projects|components|styles TEAM_ID}; shift
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    id=${1:?usage: figma team projects|components|styles TEAM_ID}; shift
     case "$sub" in
       projects) api_request GET "/v1/teams/$id/projects" ;;
       components|styles)
         query=()
-        while [ $# -gt 0 ]; do case "$1" in --page-size) query+=("page_size=${2:?value required}"); shift 2 ;; --after) query+=("after=${2:?value required}"); shift 2 ;; --before) query+=("before=${2:?value required}"); shift 2 ;; *) die "unknown flag '$1'" ;; esac; done
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --page-size) query+=("page_size=${2:?--page-size needs a value}"); shift 2 ;;
+            --after)     query+=("after=${2:?--after needs a cursor}"); shift 2 ;;
+            --before)    query+=("before=${2:?--before needs a cursor}"); shift 2 ;;
+            *) die "unknown flag '$1'" ;;
+          esac
+        done
         api_request GET "/v1/teams/$id/$sub" ${query[@]+"${query[@]}"} ;;
       *) die "usage: figma team projects|components|styles TEAM_ID" ;;
     esac ;;
   api)
-    method=$(printf '%s' "${1:?usage: figma api METHOD PATH [query k=v ...]}" | tr '[:lower:]' '[:upper:]'); path=${2:?path required}; shift 2; API_BODY=""
+    method=$(printf '%s' "${1:?usage: figma api METHOD PATH [query k=v ...]}" | tr '[:lower:]' '[:upper:]')
+    path=${2:?path required}; shift 2; API_BODY=""
     case "$method" in
       GET) api_request GET "$path" "$@" ;;
       POST|PUT|PATCH|DELETE)
         while [ $# -gt 0 ]; do
           case "$1" in
             --body) API_BODY=${2:?--body needs JSON}; shift 2 ;;
-            --body-file) if [ "${2:?--body-file needs file}" = - ]; then API_BODY=$(cat); else API_BODY=$(<"$2"); fi; shift 2 ;;
+            --body-file)
+              if [ "${2:?--body-file needs a file}" = - ]; then API_BODY=$(cat); else API_BODY=$(<"$2"); fi
+              shift 2 ;;
             -) API_BODY=$(cat); shift ;;
             *) die "unknown body argument '$1'" ;;
           esac

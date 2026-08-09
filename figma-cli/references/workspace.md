@@ -8,7 +8,10 @@ figma project files PROJECT_ID
 figma project files PROJECT_ID --branches
 ```
 
-Figma REST API cannot discover team IDs programmatically. Copy team ID from Figma team URL. Projects endpoints require separate Figma approval and may return 403 even with valid PAT.
+There is no endpoint that lists the teams you belong to — take the team ID from a
+Figma team URL (`figma.com/files/team/TEAM_ID/...`), then walk down to projects and
+files. These endpoints need a paid plan and membership of the team, so a valid
+token can still come back 403.
 
 ## Components and styles
 
@@ -19,7 +22,9 @@ figma team components TEAM_ID --page-size 100 --after CURSOR
 figma team styles TEAM_ID --page-size 100 --before CURSOR
 ```
 
-File commands list published assets in one library file. Team commands paginate with `meta.cursor.before` / `meta.cursor.after`; feed cursor back through matching flag. Team library reads require appropriate plan, team permission, and token scope.
+The file commands list what one library file publishes; the team commands list a
+whole team library and paginate — take `meta.cursor.after` / `meta.cursor.before`
+from the response and feed it back through the matching flag.
 
 ## Variables
 
@@ -27,4 +32,6 @@ File commands list published assets in one library file. Team commands paginate 
 figma variables FILE_KEY
 ```
 
-Thin wrapper around `GET /v1/files/:file_key/variables/local`. Variables REST API requires Enterprise membership; writes additionally require Full seat and edit access. Use raw API only after explicit write request.
+A thin wrapper around `GET /v1/files/:key/variables/local`. The Variables REST API
+is Enterprise-only; reads need an Enterprise org member token, and writes (raw API
+only) additionally need a Full seat and edit access to the file.

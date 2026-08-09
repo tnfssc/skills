@@ -10,10 +10,15 @@ This skill helps you use Langfuse effectively across all common workflows: instr
 
 ## Local setup
 
-The official CLI is installed here as `langfuse-cli@0.0.12` (`~/.local/bin/langfuse`), with project credentials in `~/.config/langfuse/env` (mode `600`). Prefer it over the `npx langfuse-cli` invocations used throughout the sections below:
+The official CLI is installed here as `langfuse-cli@0.0.12` (`~/.local/bin/langfuse`). Langfuse API keys are project-scoped, so each project has a mode-`600` env file under `~/.config/langfuse/` (`env` is the default; `env.<slug>` selects another project).
+
+For URL-to-profile resolution, consult the machine-local registry at `~/.config/langfuse/profiles.md`; if a URL's `/project/<id>/` is not registered, follow "Adding a project profile" in [references/setup.md](references/setup.md) and never try another profile's keys against it.
+
+Prefer the installed CLI over the `npx langfuse-cli` invocations used throughout the sections below. Select the project explicitly with `--env`:
 
 ```bash
 langfuse --env ~/.config/langfuse/env api <resource> <action>
+langfuse --env ~/.config/langfuse/env.<slug> api <resource> <action>
 ```
 
 The rest of this skill is vendored verbatim from [langfuse/skills](https://github.com/langfuse/skills) — [references/setup.md](references/setup.md) has install, auth, the pinned upstream commit, and how to refresh it.

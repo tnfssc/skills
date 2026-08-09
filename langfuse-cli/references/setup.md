@@ -1,8 +1,8 @@
-# Local CLI setup
+# Setup, auth, and vendoring
 
 ## Installation
 
-Official package: `langfuse-cli`. Install user-locally so `langfuse` lands on PATH without changing system npm directories:
+Official package: `langfuse-cli`, installed user-locally so `langfuse` lands on PATH without touching system npm directories:
 
 ```bash
 npm install -g --prefix ~/.local langfuse-cli
@@ -13,7 +13,7 @@ This repository does not wrap, fork, or reimplement the CLI.
 
 ## Credentials
 
-CLI reads project API keys and host from environment variables. Local setup stores them in `~/.config/langfuse/env` with mode `600`:
+The CLI reads `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and the host from either `LANGFUSE_HOST` or `LANGFUSE_BASE_URL`. This machine keeps them in `~/.config/langfuse/env`, mode `600`, loaded with `--env`:
 
 ```dotenv
 LANGFUSE_PUBLIC_KEY=pk-lf-XXXX
@@ -22,18 +22,20 @@ LANGFUSE_HOST=https://langfuse.example.com
 LANGFUSE_BASE_URL=https://langfuse.example.com
 ```
 
-Use both host variable names because official CLI accepts either while Langfuse SDKs may prefer `LANGFUSE_BASE_URL`.
+Both host names are set because the CLI takes either while the Langfuse SDKs read `LANGFUSE_BASE_URL` — so the same file works when sourced for application code.
 
 ```bash
 langfuse --env ~/.config/langfuse/env api __schema
 langfuse --env ~/.config/langfuse/env api traces list --limit 5 --json
 ```
 
-Credentials are project-scoped. Never commit the env file, paste secret keys into chat, or pass keys as command-line flags. Rotate compromised keys in project settings.
+Keys are project-scoped and come from the project's Settings → API Keys. Never commit the env file, paste secret keys into chat, or pass keys as command-line flags. Rotate compromised keys in project settings.
 
-## Local source
+## Vendored upstream skill
 
-On this machine, copy the active, uncommented `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` values from `~/Code/writer-monorepo/backend/.env` into the local CLI env file. Ignore commented example or alternate-environment blocks. Host, project identifiers, and secret values are intentionally omitted from this public repository.
+`SKILL.md` and every `references/*.md` except this file are copies of `skills/langfuse/` from [langfuse/skills](https://github.com/langfuse/skills) at commit `b9958d6c7b0df35a7f1df76a5f6c3a4505b0a3d3`, vendored 2026-08-09 with only trailing whitespace normalized.
+
+To refresh: diff that directory at a newer upstream commit, take the upstream content as-is, keep the local frontmatter and "Local setup" section in `SKILL.md`, and record the new commit here. `langfuse get-skill` prints upstream's current `SKILL.md` from `main`, which is a quick drift check but does not cover the references.
 
 ## Troubleshooting
 

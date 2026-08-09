@@ -3,23 +3,20 @@ name: langfuse-cli
 description: Reference for the official Langfuse Agent Skill and `langfuse` CLI — query traces, observations, prompts, datasets, scores, sessions, metrics, and other API resources; inspect current Langfuse docs; instrument applications; migrate or tune prompts; analyze errors; and work with evaluation workflows.
 ---
 
-
 # Langfuse
 
 This skill helps you use Langfuse effectively across all common workflows: instrumenting applications, migrating prompts, debugging traces, and accessing data programmatically.
 
 
-## Local installation and provenance
+## Local setup
 
-This repository vendors the official Langfuse Agent Skill from [langfuse/skills](https://github.com/langfuse/skills), upstream commit `b9958d6c7b0df35a7f1df76a5f6c3a4505b0a3d3` (installed 2026-08-09). Refresh by comparing `skills/langfuse/` at a newer upstream commit; keep upstream reference content unchanged except harmless formatting normalization, and record the new commit.
-
-Official CLI package: `langfuse-cli@0.0.12`, installed user-locally with npm; executable: `~/.local/bin/langfuse`. This machine keeps credentials in `~/.config/langfuse/env` (mode `600`). Use:
+The official CLI is installed here as `langfuse-cli@0.0.12` (`~/.local/bin/langfuse`), with project credentials in `~/.config/langfuse/env` (mode `600`). Prefer it over the `npx langfuse-cli` invocations used throughout the sections below:
 
 ```bash
 langfuse --env ~/.config/langfuse/env api <resource> <action>
 ```
 
-Self-hosted host and project credentials stay local. See [references/setup.md](references/setup.md). Prefer installed `langfuse` command over upstream `npx langfuse-cli` examples on this machine.
+The rest of this skill is vendored verbatim from [langfuse/skills](https://github.com/langfuse/skills) — [references/setup.md](references/setup.md) has install, auth, the pinned upstream commit, and how to refresh it.
 
 ## Core Principles
 

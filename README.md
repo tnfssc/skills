@@ -51,7 +51,7 @@ sh -c 'git -C "$HOME/.tnfssc-skills" pull --ff-only && mkdir -p "$HOME/.agents/s
 | [hallmark](hallmark/) | Design and audit interfaces with an anti-AI-slop visual discipline | [nutlope/hallmark](https://github.com/nutlope/hallmark) |
 | [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |
 | [jira-cli](jira-cli/) | Work with Jira issues, sprints, boards, projects, and JQL using the `jira` CLI | Local zip |
-| [langfuse-cli](langfuse-cli/) | Use official Langfuse CLI and Agent Skill for observability, prompts, datasets, scores, and evaluation workflows | [langfuse/skills](https://github.com/langfuse/skills) |
+| [langfuse-cli](langfuse-cli/) | Instrument, debug, and evaluate LLM apps with Langfuse — traces, prompts, datasets, and scores via the `langfuse` CLI | [langfuse/skills](https://github.com/langfuse/skills) |
 | [linear-cli](linear-cli/) | Work with Linear issues, projects, cycles, and docs via the bundled mcpc-backed `linear` CLI | [Linear MCP](https://linear.app/docs/mcp) |
 | [mcpc](mcpc/) | Shell CLI for MCP servers — connect, list/call tools, read resources, async tasks | [apify/mcpc](https://github.com/apify/mcpc) |
 | [open-browser-use](open-browser-use/) | Guidance for installing, verifying, troubleshooting, and operating Open Browser Use | Local zip |

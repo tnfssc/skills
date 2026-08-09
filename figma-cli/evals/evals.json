@@ -1,0 +1,53 @@
+{
+  "skill_name": "figma-cli",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Inspect this Figma frame and save a 2x PNG: https://www.figma.com/design/AbCdEf123456/Example?node-id=12-34",
+      "expected_output": "Uses figma screenshot with full URL, scale 2, and explicit output file; relies on automatic file-key and node-id parsing.",
+      "files": [],
+      "assertions": [
+        "Command uses figma screenshot",
+        "Command passes full Figma URL",
+        "Command uses --scale 2",
+        "Command supplies -o or --output",
+        "Response does not manually download or decode base64"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Show only node 4:56 from Figma file AbCdEf123456, two levels deep, then summarize its layout.",
+      "expected_output": "Uses figma nodes with file key, node ID, and --depth 2, then reads returned JSON without fetching whole file.",
+      "files": [],
+      "assertions": [
+        "Command uses figma nodes with file key AbCdEf123456 and node 4:56 (or 4-56)",
+        "Command uses --depth 2",
+        "Response avoids full-file fetch",
+        "Response summarizes observable node data"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "List published components for team 123456 and follow next page cursor 7890.",
+      "expected_output": "Uses figma team components with team ID, --after 7890, and optionally a page size; explains cursor comes from meta.cursor.after.",
+      "files": [],
+      "assertions": [
+        "Command uses figma team components 123456",
+        "Command uses --after 7890",
+        "Response identifies meta.cursor.after as pagination source"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Post 'Approved for handoff' on this Figma file.",
+      "expected_output": "Treats comment creation as write, confirms target and intent unless explicitly told to execute, then uses figma comment URL with exact text.",
+      "files": [],
+      "assertions": [
+        "Response treats comment as write requiring confirmation",
+        "Command uses figma comment",
+        "Command preserves exact comment text",
+        "Response does not use raw API when friendly command exists"
+      ]
+    }
+  ]
+}

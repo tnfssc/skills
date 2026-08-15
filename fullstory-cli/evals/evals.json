@@ -1,0 +1,68 @@
+{
+  "skill_name": "fullstory-cli",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "How many users rage-clicked on checkout in the last 30 days? Use Fullstory.",
+      "expected_output": "Searches saved metrics first, builds a single_number metric only when no suitable metric exists, computes it for last_30_days, and reports the returned Fullstory URL.",
+      "files": [],
+      "assertions": [
+        "Output uses fullstory metric get before any build",
+        "New metric uses fullstory metric build single_number",
+        "Computation uses fullstory metric compute with last_30_days",
+        "Response includes or promises to surface the Fullstory verification URL"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Compare rage clicks on mobile versus desktop in Fullstory.",
+      "expected_output": "Uses one top_n metric grouped by device type, not separate user segments.",
+      "files": [],
+      "assertions": [
+        "Output chooses event dimensionality",
+        "Command uses fullstory metric build top_n",
+        "Query explicitly groups by device type",
+        "Output does not build mobile-user and desktop-user segments"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Inspect Fullstory session 123:456 around page p1 timestamp 9000 and tell me what changed from 8000.",
+      "expected_output": "Opens the session by its opaque session ID, uses current screenshot/tree/diff commands, closes the client, and never uses deprecated session_view.",
+      "files": [],
+      "assertions": [
+        "Output uses fullstory session open 123:456",
+        "Output uses fullstory session screenshot or tree at timestamp 9000",
+        "Output uses fullstory session diff with timestamps 8000 and 9000",
+        "Output always closes with fullstory session close",
+        "Output never uses session_view"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Summarize five matching Fullstory session transcripts without filling the main context with raw events.",
+      "expected_output": "Redirects each session event result to a file, uses jq or isolated subagents for focused analysis, and synthesizes patterns with session URLs.",
+      "files": [],
+      "assertions": [
+        "Output uses fullstory session events",
+        "Each transcript is redirected to a file",
+        "Output uses jq or isolated subagent analysis",
+        "Output does not paste full transcripts into main context",
+        "Response distinguishes qualitative session evidence from quantitative measurement"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Set up Fullstory CLI on this machine using an API key file instead of OAuth.",
+      "expected_output": "Places FULLSTORY_API_KEY in ~/.config/fullstory/env, requires mode 600, runs fullstory setup, and explains MCP uses Bearer authentication.",
+      "files": [],
+      "assertions": [
+        "Output uses ~/.config/fullstory/env",
+        "Output requires chmod 600",
+        "Output uses variable name FULLSTORY_API_KEY without exposing a value",
+        "Output runs fullstory setup",
+        "Output states MCP API-key auth uses Authorization Bearer"
+      ]
+    }
+  ]
+}

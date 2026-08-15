@@ -67,15 +67,24 @@ heal() {
 }
 
 render() {
-  local payload
-  payload=$(jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")')
-  [ -z "$payload" ] && return 0
-  if [ "$RAW" = 1 ]; then printf '%s\n' "$payload"; return; fi
-  if [ "$COMPACT" = 1 ]; then
-    printf '%s\n' "$payload" | jq -c . 2>/dev/null || printf '%s\n' "$payload"
-  else
-    printf '%s\n' "$payload" | jq . 2>/dev/null || printf '%s\n' "$payload"
+  local response payload image_data image_tmp image_path
+  response=$(cat)
+  payload=$(jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' <<<"$response")
+  if [ -n "$payload" ]; then
+    if [ "$RAW" = 1 ]; then printf '%s\n' "$payload"
+    elif [ "$COMPACT" = 1 ]; then
+      printf '%s\n' "$payload" | jq -c . 2>/dev/null || printf '%s\n' "$payload"
+    else
+      printf '%s\n' "$payload" | jq . 2>/dev/null || printf '%s\n' "$payload"
+    fi
   fi
+  while IFS= read -r image_data; do
+    image_tmp=$(mktemp /tmp/fullstory-img-XXXXXX)
+    printf '%s' "$image_data" | base64 -D > "$image_tmp"
+    image_path="${image_tmp}.png"
+    mv "$image_tmp" "$image_path"
+    printf '%s\n' "$image_path"
+  done < <(jq -r '.content[]? | select(.type=="image") | .data' <<<"$response")
 }
 
 invoke() {

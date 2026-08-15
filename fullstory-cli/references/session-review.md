@@ -30,6 +30,8 @@ The current hosted tools are `session_screenshot` and `session_get_a11y_tree`. T
    fullstory session screenshot CLIENT_ID PAGE_ID TIMESTAMP
    ```
 
+   Screenshots print a path to a PNG in `/tmp`; `session_screenshot` can return `failed to capture screenshot` for some timestamps, so retry at a nearby or earlier timestamp.
+
 3. Inspect the semantic structure and accessible state:
 
    ```bash

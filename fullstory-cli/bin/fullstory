@@ -32,6 +32,10 @@ trap 'rm -f "$ERRF"' EXIT
 ARGS='{}'
 arg_str() { ARGS=$(jq --arg k "$1" --arg v "$2" '.[$k]=$v' <<<"$ARGS"); }
 arg_raw() { ARGS=$(jq --arg k "$1" --argjson v "$2" '.[$k]=$v' <<<"$ARGS"); } # num/bool/array/null
+arg_int() { # arg_int KEY VALUE MESSAGE — reject non-integers before jq --argjson chokes on them
+  case "$2" in ''|*[!0-9]*) die "$3" ;; esac
+  arg_raw "$1" "$2"
+}
 
 load_api_key() {
   [ -n "${FULLSTORY_API_KEY:-}" ] && return 0
@@ -225,9 +229,7 @@ case "$cmd" in
         invoke compute_funnel ;;
       sessions)
         arg_str funnel_id "${1:?usage: fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]}"
-        step=${2:?usage: fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]}
-        case "$step" in ''|*[!0-9]*) die "COMPLETED_STEP must be an integer" ;; esac
-        arg_raw completed_step "$step"
+        arg_int completed_step "${2:?usage: fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]}" "COMPLETED_STEP must be an integer"
         [ "${3:-}" = --dropoffs ] && arg_raw did_not_complete true
         invoke get_funnel_sessions ;;
       *) die "usage: fullstory funnel get|build|compute|sessions" ;;
@@ -256,22 +258,18 @@ case "$cmd" in
       screenshot)
         arg_str client_id "${1:?CLIENT_ID required}"
         arg_str page_id "${2:?PAGE_ID required}"
-        ts=${3:?TIMESTAMP required}
-        case "$ts" in ''|*[!0-9]*) die "TIMESTAMP must be integer milliseconds" ;; esac
-        arg_raw timestamp "$ts"
+        arg_int timestamp "${3:?TIMESTAMP required}" "TIMESTAMP must be integer milliseconds"
         invoke session_screenshot ;;
       tree)
         arg_str client_id "${1:?CLIENT_ID required}"
         arg_str page_id "${2:?PAGE_ID required}"
-        ts=${3:?TIMESTAMP required}
-        case "$ts" in ''|*[!0-9]*) die "TIMESTAMP must be integer milliseconds" ;; esac
-        arg_raw timestamp "$ts"
+        arg_int timestamp "${3:?TIMESTAMP required}" "TIMESTAMP must be integer milliseconds"
         invoke session_get_a11y_tree ;;
       diff)
         arg_str client_id "${1:?CLIENT_ID required}"
         arg_str page_id "${2:?PAGE_ID required}"
-        arg_raw from_ts "${3:?FROM_TS required}"
-        arg_raw to_ts "${4:?TO_TS required}"
+        arg_int from_ts "${3:?FROM_TS required}" "FROM_TS must be integer milliseconds"
+        arg_int to_ts "${4:?TO_TS required}" "TO_TS must be integer milliseconds"
         invoke session_diff ;;
       close)
         arg_str client_id "${1:?CLIENT_ID required}"

@@ -1,6 +1,6 @@
-# Live Fullstory MCP tool catalog
+# Tool catalog (33 tools on api.fullstory.com/mcp/fullstory, snapshot 2026-08-15)
 
-This catalog uses the [Fullstory MCP Tools Reference](https://developer.fullstory.com/mcp/tools-reference/), checked on 2026-08-15.
+Names come from the live server, which differs from the [Fullstory MCP Tools Reference](https://developer.fullstory.com/mcp/tools-reference/) in both directions.
 
 Use `fullstory tools` for server-authoritative discovery and `fullstory call TOOL ...` for raw access.
 
@@ -14,7 +14,7 @@ Use `fullstory tools` for server-authoritative discovery and `fullstory call TOO
 | `session_diff` | `fullstory session diff CLIENT_ID PAGE_ID FROM_TS TO_TS` |
 | `session_close` | `fullstory session close CLIENT_ID` |
 
-`session_view` is live but deprecated and nonfunctional. Use `session_screenshot` and `session_get_a11y_tree` instead.
+`session_view` is still listed by the server but is deprecated and nonfunctional. Do not call it; use `session_screenshot` and `session_get_a11y_tree`.
 
 ## Analytics
 

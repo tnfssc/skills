@@ -78,6 +78,7 @@ render() {
       printf '%s\n' "$payload" | jq . 2>/dev/null || printf '%s\n' "$payload"
     fi
   fi
+  # image blocks -> decoded /tmp PNG, path on stdout (BSD mktemp needs trailing Xs, so .png is appended after)
   while IFS= read -r image_data; do
     image_tmp=$(mktemp /tmp/fullstory-img-XXXXXX)
     printf '%s' "$image_data" | base64 -D > "$image_tmp"

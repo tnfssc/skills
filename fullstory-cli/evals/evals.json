@@ -27,11 +27,11 @@
     },
     {
       "id": 2,
-      "prompt": "Inspect Fullstory session device 123 session 456 around page p1 timestamp 9000 and tell me what changed from 8000.",
-      "expected_output": "Opens the session, uses current screenshot/tree/diff commands, closes the client, and never uses deprecated session_view.",
+      "prompt": "Inspect Fullstory session 123:456 around page p1 timestamp 9000 and tell me what changed from 8000.",
+      "expected_output": "Opens the session by its opaque session ID, uses current screenshot/tree/diff commands, closes the client, and never uses deprecated session_view.",
       "files": [],
       "assertions": [
-        "Output uses fullstory session open 123 456",
+        "Output uses fullstory session open 123:456",
         "Output uses fullstory session screenshot or tree at timestamp 9000",
         "Output uses fullstory session diff with timestamps 8000 and 9000",
         "Output always closes with fullstory session close",

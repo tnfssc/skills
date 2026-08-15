@@ -16,10 +16,10 @@ The current hosted tools are `session_screenshot` and `session_get_a11y_tree`. T
 
 ## Workflow
 
-1. Extract the `device_id` and `session_id` from the replay URL, then open the session:
+1. Extract the opaque `session_id` from the replay URL, then open the session:
 
    ```bash
-   fullstory session open DEVICE_ID SESSION_ID
+   fullstory session open SESSION_ID
    ```
 
    Save the returned `client_id`, and note the `page_id` and timestamps of interesting events from the summaries. Scan the event summaries for navigations, clicks, errors, network failures, rage clicks, and custom events.

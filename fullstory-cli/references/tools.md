@@ -8,7 +8,7 @@ Use `fullstory tools` for server-authoritative discovery and `fullstory call TOO
 
 | Tool | CLI |
 |---|---|
-| `session_open` | `fullstory session open DEVICE_ID SESSION_ID` |
+| `session_open` | `fullstory session open SESSION_ID` |
 | `session_screenshot` | `fullstory session screenshot CLIENT_ID PAGE_ID TIMESTAMP` |
 | `session_get_a11y_tree` | `fullstory session tree CLIENT_ID PAGE_ID TIMESTAMP` |
 | `session_diff` | `fullstory session diff CLIENT_ID PAGE_ID FROM_TS TO_TS` |
@@ -29,7 +29,7 @@ Use `fullstory tools` for server-authoritative discovery and `fullstory call TOO
 | Tool | CLI |
 |---|---|
 | `get_sessions` | `fullstory sessions --metric ID` or `--segment ID` |
-| `get_session_events` | `fullstory session events DEVICE_ID SESSION_ID` |
+| `get_session_events` | `fullstory session events SESSION_ID` |
 | `get_pages` | `fullstory pages [REGEX]` |
 
 ## StoryAI opportunities

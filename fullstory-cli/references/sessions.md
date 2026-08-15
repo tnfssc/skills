@@ -9,7 +9,7 @@ Sessions answer why, not how many. Use them when the user asks for examples, an 
 Session event transcripts are large. Never stream several directly into the main conversation. Redirect each transcript to a file:
 
 ```bash
-fullstory session events DEVICE_ID SESSION_ID --raw > /tmp/fullstory-session.json
+fullstory session events SESSION_ID --raw > /tmp/fullstory-session.json
 jq '.events[] | {event_time,event_type,event_properties}' /tmp/fullstory-session.json
 ```
 

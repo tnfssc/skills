@@ -1,6 +1,6 @@
 # Live Fullstory MCP tool catalog
 
-Source: [Fullstory MCP Tools Reference](https://developer.fullstory.com/mcp/tools-reference/), checked 2026-08-15.
+This catalog uses the [Fullstory MCP Tools Reference](https://developer.fullstory.com/mcp/tools-reference/), checked on 2026-08-15.
 
 Use `fullstory tools` for server-authoritative discovery and `fullstory call TOOL ...` for raw access.
 
@@ -34,15 +34,15 @@ Use `fullstory tools` for server-authoritative discovery and `fullstory call TOO
 
 ## StoryAI opportunities
 
-Thin aliases accept raw `mcpc` argument syntax because live schemas can evolve:
+Use the raw passthrough for opportunity tools because their live schemas can evolve:
 
 | Tool | CLI |
 |---|---|
-| `discover_groups` | `fullstory opportunity discover [k:=v ...]` |
-| `get_opportunity_stats` | `fullstory opportunity stats k:=v ...` |
-| `classify_opportunity` | `fullstory opportunity classify k:=v ...` |
-| `get_opportunities` | `fullstory opportunity list [k:=v ...]` |
-| `get_opportunity` | `fullstory opportunity get k:=v ...` |
-| `get_sessions_for_opportunity` | `fullstory opportunity sessions k:=v ...` |
+| `discover_groups` | `fullstory call discover_groups k:=v ...` |
+| `get_opportunity_stats` | `fullstory call get_opportunity_stats k:=v ...` |
+| `classify_opportunity` | `fullstory call classify_opportunity k:=v ...` |
+| `get_opportunities` | `fullstory call get_opportunities k:=v ...` |
+| `get_opportunity` | `fullstory call get_opportunity k:=v ...` |
+| `get_sessions_for_opportunity` | `fullstory call get_sessions_for_opportunity k:=v ...` |
 
 `get_opportunities`, `get_opportunity`, and `get_sessions_for_opportunity` require StoryAI Premium according to current docs.

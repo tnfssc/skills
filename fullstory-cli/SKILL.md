@@ -14,7 +14,7 @@ description: Use Fullstory from the terminal for behavioral analytics, metrics, 
 - **Funnels** — build, compute, and retrieve completion or drop-off sessions. See `references/general-analysis.md`.
 - **Sessions** — retrieve matching sessions and inspect large event transcripts outside main context. See `references/sessions.md`.
 - **Visual session review** — open, screenshot, inspect accessibility trees, diff, close. See `references/session-review.md`.
-- **StoryAI opportunities and pages** — thin aliases plus raw passthrough. See `references/tools.md`.
+- **StoryAI opportunities and pages** — `fullstory pages`, plus raw `fullstory call` for the opportunity tools. See `references/tools.md`.
 - **Setup, auth, plumbing, provenance** — see `references/setup.md`.
 
 ## Facts worth knowing

@@ -8,9 +8,9 @@
 https://api.fullstory.com/mcp/fullstory
 ```
 
-Each friendly command builds a JSON argument object and calls `mcpc --json @fullstory tools-call`. `fullstory call` is raw passthrough. MCP text envelopes are unwrapped so stdout contains tool payload.
+Each friendly command builds a JSON argument object and calls `mcpc --json @fullstory tools-call`. `fullstory call` provides raw passthrough. MCP text envelopes are unwrapped so stdout contains the tool payload.
 
-Fullstory org must have both StoryAI and Model Context Protocol enabled under account settings. A connected org with StoryAI disabled may expose zero tools.
+A Fullstory organization must have both StoryAI and Model Context Protocol enabled under its account settings. A connected organization with StoryAI disabled may expose zero tools.
 
 ## OAuth setup
 
@@ -23,39 +23,39 @@ fullstory tools
 
 ## API-key setup
 
-`mcpc connect` supports custom HTTP headers. Fullstory API keys therefore work without proxy. MCP uses a Bearer header, unlike Fullstory REST API's Basic header.
+`mcpc connect` supports custom HTTP headers. Fullstory API keys therefore work without a proxy. MCP uses a Bearer header, unlike the Fullstory REST API's Basic header.
 
-Either export key:
+Either export the key:
 
 ```bash
 export FULLSTORY_API_KEY='...'
 fullstory setup
 ```
 
-Or store it in `~/.config/fullstory/env`:
+Or store the key in `~/.config/fullstory/env`:
 
 ```dotenv
 FULLSTORY_API_KEY=...
 ```
 
-Then:
+Then run the setup command:
 
 ```bash
 chmod 600 ~/.config/fullstory/env
 fullstory setup
 ```
 
-Wrapper refuses key file unless mode is exactly `600`. Never commit key or pass it as a normal CLI argument.
+The wrapper refuses the key file unless its mode is exactly `600`. Never commit the key or pass it as a normal CLI argument.
 
 ## Session behavior
 
 - `FULLSTORY_SESSION` defaults to `@fullstory`.
-- `FULLSTORY_SERVER` defaults to hosted endpoint above.
+- `FULLSTORY_SERVER` defaults to the hosted endpoint above.
 - `FULLSTORY_TIMEOUT` defaults to 120 seconds.
 - `FULLSTORY_ENV_FILE` can select another key file.
-- Calls retry once after mcpc exit 1, 3, or 4. Server/tool errors (exit 2) are not retried.
+- Calls retry once after mcpc exits with 1, 3, or 4. Server or tool errors (exit 2) are not retried.
 
-Troubleshooting:
+Use these commands for troubleshooting:
 
 ```bash
 fullstory status
@@ -72,7 +72,7 @@ Analytics, comparison, validation, session, and review guidance was adapted from
 b20614e2d08d7a7c70775bb62b5af640f60b024b
 ```
 
-Adaptations replace direct MCP calls with `fullstory` CLI commands, preserve large-transcript isolation guidance, and update session review to current hosted tools (`session_screenshot`, `session_get_a11y_tree`) from [Fullstory's live tool reference](https://developer.fullstory.com/mcp/tools-reference/).
+The adaptations replace direct MCP calls with `fullstory` CLI commands, preserve the large-transcript isolation guidance, route segment scoping through `compute_metric` instead of the upstream `update_metric` guidance, and update session review to the current hosted tools (`session_screenshot`, `session_get_a11y_tree`) from [Fullstory's live tool reference](https://developer.fullstory.com/mcp/tools-reference/).
 
 To refresh:
 

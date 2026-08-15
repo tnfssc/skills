@@ -1,36 +1,38 @@
 # Validating results
 
-Adapted from upstream `general-analysis/references/validation.md`.
+This guide was adapted from upstream `general-analysis/references/validation.md`.
 
-Validate when result is zero, anomalous, discontinuous, or disputed. Normal-looking results need no extra calls; include returned Fullstory URL for verification.
+Validate a result when it is zero, anomalous, discontinuous, or disputed. Normal-looking results need no extra calls; include the returned Fullstory URL for verification.
 
 ## Zero: always cross-check
 
-1. Refine or rebuild without narrow page/element filters.
-2. Expand time window to `last_30_days` or `last_90_days`.
-3. Compute broad page-view metric to confirm org has traffic.
+1. Refine or rebuild without narrow page or element filters.
+2. Expand the time window to `last_30_days` or `last_90_days`.
+3. Compute a broad page-view metric to confirm that the organization has traffic.
+
+> `metric update` and `segment update` persist a new object and return a **new** id. Compute the returned id, not the one you passed.
 
 ```bash
-fullstory metric update METRIC_ID 'remove page and element filters'
-fullstory metric compute METRIC_ID last_90_days
+fullstory metric update METRIC_ID 'remove page and element filters'      # returns a NEW metric_id
+fullstory metric compute NEW_METRIC_ID last_90_days
 fullstory metric build single_number 'count all page views'
 ```
 
-If broad traffic is also zero, possible collection, org, permission, or time-window issue. Do not claim event absence.
+If broad traffic is also zero, there may be a collection, organization, permission, or time-window issue. Do not claim that the event is absent.
 
 ## Anomalies
 
-Investigate rates above 100%, implausible counts, contradictions, or sharp discontinuities before presenting conclusion.
+Investigate rates above 100%, implausible counts, contradictions, or sharp discontinuities before presenting a conclusion.
 
-Slice established metric by dimension:
+Slice an established metric by dimension:
 
 ```bash
-fullstory metric update METRIC_ID 'change to top_n grouped by page' top_n
-fullstory metric compute METRIC_ID
+fullstory metric update METRIC_ID 'change to top_n grouped by page' top_n      # returns a NEW metric_id
+fullstory metric compute NEW_METRIC_ID
 ```
 
-For sudden trend drop or spike, compare broad traffic over same period. Traffic-wide discontinuity suggests collection issue; metric-only change may be real.
+For a sudden trend drop or spike, compare broad traffic over the same period. A traffic-wide discontinuity suggests a collection issue; a metric-only change may be real.
 
 ## Reporting
 
-Do not narrate every successful check. Report validation detail when it changed result, exposed data-quality issue, or requires user choice.
+Do not narrate every successful check. Report validation details when they changed the result, exposed a data-quality issue, or require a user choice.

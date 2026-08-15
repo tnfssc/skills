@@ -1,32 +1,32 @@
 # Comparisons
 
-Adapted from upstream `skills/comparisons` at pinned commit in `setup.md`.
+This guide was adapted from upstream `skills/comparisons` at the pinned commit in `setup.md`.
 
-Comparison mechanism depends on axis.
+The right mechanism depends on what the comparison axis is.
 
 ## Event or session properties: dimensionality
 
-If property describes context when event fired, use one `top_n` metric grouped by that property.
+If the property describes the context of the event at the moment it fired, use a single `top_n` metric grouped by that property.
 
-Examples: device type, browser, OS, page URL, element.
+Examples include device type, browser, OS, page URL, and element.
 
 ```bash
 fullstory metric build top_n 'rage clicks grouped by device type'
 ```
 
-Refine existing metric instead of rebuilding:
+Refine an existing metric instead of rebuilding it:
 
 ```bash
-fullstory metric update METRIC_ID 'filter to Chrome only'
+fullstory metric update METRIC_ID 'filter to Chrome only'      # returns a NEW metric_id
 ```
 
 Do not use user segments for event properties. A user who used mobile once and later rage-clicked on desktop may qualify for both user cohorts, misattributing desktop events to mobile.
 
 ## User properties: separate segments
 
-Properties describing user should use segments. Fullstory resolves user properties to last known value for segment matching.
+Properties that describe the user should use segments. Fullstory resolves user properties to their last known values for segment matching.
 
-Examples: signed-up status, first/last seen, total sessions, plan/account properties set as custom user properties.
+Examples include `signed_up`, `first_seen` / `last_seen`, `total_sessions`, and `user_var_*` custom properties set via `setUserProperties`.
 
 ```bash
 fullstory segment build 'users whose current plan is enterprise'
@@ -34,15 +34,14 @@ fullstory segment build 'users whose current plan is free'
 fullstory metric build single_number 'count application errors'
 ```
 
-Attach each segment to metric, compute, record result, repeat. Inspect live `update_metric` schema before raw segment attachment:
+Compute the same metric once per segment, recording each result.
 
 ```bash
-mcpc @fullstory tools-get update_metric
-fullstory call update_metric metric_id:=METRIC_ID segment_id:=SEGMENT_ID
-fullstory metric compute METRIC_ID
+mcpc @fullstory tools-get compute_metric        # confirm the live parameter set
+fullstory call compute_metric metric_id:=METRIC_ID segment_id:=SEGMENT_ID
 ```
 
-Using a dimension for user property answers event-time question instead: user who changes plan mid-period has events split across old and new values. Use this only when point-in-time attribution is intended.
+Using a dimension for a user property answers an event-time question instead: a user who changes plans mid-period has events split across old and new values. Use this only when point-in-time attribution is intended.
 
 ## Decision table
 
@@ -50,8 +49,8 @@ Using a dimension for user property answers event-time question instead: user wh
 |---|---|---|
 | Device, browser, OS | Event | `top_n` dimensionality |
 | Page URL, element | Event | `top_n` dimensionality |
-| Signed-up, first/last seen | User | Separate segments |
-| Total sessions | User | Separate segments |
-| Custom user properties | User | Separate segments |
+| `signed_up`, `first_seen` / `last_seen` | User | Separate segments |
+| `total_sessions` | User | Separate segments |
+| `user_var_*` set via `setUserProperties` | User | Separate segments |
 
-If property level remains unknown, prefer dimensionality: fewer calls and precise event attribution. State assumption.
+If the property level remains unknown, prefer dimensionality because it uses fewer calls and provides precise event attribution. State the assumption.

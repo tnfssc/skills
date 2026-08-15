@@ -1,8 +1,8 @@
 # Session review
 
-Adapted from upstream `skills/session-review`, corrected to live tool contract checked 2026-08-15.
+This guide was adapted from upstream `skills/session-review` and corrected to the live tool contract checked on 2026-08-15.
 
-Use for user-reported bugs, unexpected behavior, user-flow analysis, or UI-state validation.
+Use this workflow for user-reported bugs, unexpected behavior, user-flow analysis, or UI-state validation.
 
 ## Current command sequence
 
@@ -12,37 +12,37 @@ fullstory session open
   → fullstory session close
 ```
 
-Current hosted tools are `session_screenshot` and `session_get_a11y_tree`. Deprecated `session_view` is nonfunctional and must not be used.
+The current hosted tools are `session_screenshot` and `session_get_a11y_tree`. The deprecated `session_view` tool is nonfunctional and must not be used.
 
 ## Workflow
 
-1. Extract `device_id` and `session_id` from replay URL, then open:
+1. Extract the `device_id` and `session_id` from the replay URL, then open the session:
 
    ```bash
    fullstory session open DEVICE_ID SESSION_ID
    ```
 
-   Save returned `client_id`. Scan event summaries for navigations, clicks, errors, network failures, rage clicks, and custom events.
+   Save the returned `client_id`, and note the `page_id` and timestamps of interesting events from the summaries. Scan the event summaries for navigations, clicks, errors, network failures, rage clicks, and custom events.
 
-2. Render screenshot at key moment:
+2. Render a screenshot at a key moment:
 
    ```bash
    fullstory session screenshot CLIENT_ID PAGE_ID TIMESTAMP
    ```
 
-3. Inspect semantic structure and accessible state:
+3. Inspect the semantic structure and accessible state:
 
    ```bash
    fullstory session tree CLIENT_ID PAGE_ID TIMESTAMP
    ```
 
-4. Compare state changes:
+4. Compare the state changes:
 
    ```bash
    fullstory session diff CLIENT_ID PAGE_ID FROM_TIMESTAMP TO_TIMESTAMP
    ```
 
-5. Close even after investigation errors:
+5. Close the session even after investigation errors:
 
    ```bash
    fullstory session close CLIENT_ID
@@ -52,10 +52,10 @@ Sequential increasing timestamps are faster than random access.
 
 ## Report
 
-- What user saw at each key moment.
-- Exact observed errors or missing changes.
-- Evidence-backed cause when transcript or rendered state proves one.
-- Unknown when recording cannot establish cause.
-- Session URL and relevant timestamps.
+- State what the user saw at each key moment.
+- Include exact observed errors or missing changes.
+- Give an evidence-backed cause when the transcript or rendered state proves one.
+- Report the cause as unknown when the recording cannot establish it.
+- Include the session URL and relevant timestamps.
 
-Do not infer beyond events, screenshot, accessibility tree, or diff.
+Do not infer beyond the events, screenshot, accessibility tree, or diff.

@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+# fullstory — standalone Fullstory CLI backed by mcpc.
+set -uo pipefail
+
+SESSION=${FULLSTORY_SESSION:-@fullstory}
+SERVER=${FULLSTORY_SERVER:-https://api.fullstory.com/mcp/fullstory}
+TIMEOUT=${FULLSTORY_TIMEOUT:-120}
+ENV_FILE=${FULLSTORY_ENV_FILE:-${HOME}/.config/fullstory/env}
+RAW=0
+COMPACT=0
+
+die() { echo "fullstory: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null || die "'$1' is required but not installed"; }
+need mcpc
+need jq
+
+ERRF=$(mktemp)
+trap 'rm -f "$ERRF"' EXIT
+
+load_api_key() {
+  [ -n "${FULLSTORY_API_KEY:-}" ] && return 0
+  [ -f "$ENV_FILE" ] || return 1
+  local mode line
+  if mode=$(stat -f '%Lp' "$ENV_FILE" 2>/dev/null); then :
+  elif mode=$(stat -c '%a' "$ENV_FILE" 2>/dev/null); then :
+  else die "cannot inspect permissions on $ENV_FILE"
+  fi
+  [ "$mode" = 600 ] || die "$ENV_FILE must have mode 600 (found $mode)"
+  line=$(sed -n 's/^[[:space:]]*FULLSTORY_API_KEY[[:space:]]*=[[:space:]]*//p' "$ENV_FILE" | tail -n 1)
+  line=${line#\"}; line=${line%\"}; line=${line#\'}; line=${line%\'}
+  [ -n "$line" ] || die "FULLSTORY_API_KEY missing or empty in $ENV_FILE"
+  FULLSTORY_API_KEY=$line
+  export FULLSTORY_API_KEY
+}
+
+connect_session() {
+  if load_api_key; then
+    mcpc connect "$SERVER" "$SESSION" --no-profile -H "Authorization: Bearer $FULLSTORY_API_KEY"
+  else
+    mcpc connect "$SERVER" "$SESSION"
+  fi
+}
+
+heal() {
+  mcpc restart "$SESSION" >/dev/null 2>&1 || connect_session >/dev/null 2>&1
+}
+
+render() {
+  local payload
+  payload=$(jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")')
+  [ -z "$payload" ] && return 0
+  if [ "$RAW" = 1 ]; then printf '%s\n' "$payload"; return; fi
+  if [ "$COMPACT" = 1 ]; then
+    printf '%s\n' "$payload" | jq -c . 2>/dev/null || printf '%s\n' "$payload"
+  else
+    printf '%s\n' "$payload" | jq . 2>/dev/null || printf '%s\n' "$payload"
+  fi
+}
+
+invoke_json() {
+  local tool=$1 args=$2 response rc
+  response=$(printf '%s' "$args" | mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" 2>"$ERRF") && rc=0 || rc=$?
+  if [ "$rc" = 1 ] || [ "$rc" = 3 ] || [ "$rc" = 4 ]; then
+    heal
+    response=$(printf '%s' "$args" | mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" 2>"$ERRF") && rc=0 || rc=$?
+  fi
+  if [ "$rc" != 0 ]; then
+    cat "$ERRF" >&2
+    [ "$rc" = 4 ] && echo "fullstory: auth failed — run 'fullstory setup'" >&2
+    return "$rc"
+  fi
+  if jq -e '.isError == true' <<<"$response" >/dev/null 2>&1; then
+    jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' <<<"$response" >&2
+    return 2
+  fi
+  render <<<"$response"
+}
+
+invoke_args() {
+  local tool=$1 response rc
+  shift
+  response=$(mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" "$@" 2>"$ERRF") && rc=0 || rc=$?
+  if [ "$rc" = 1 ] || [ "$rc" = 3 ] || [ "$rc" = 4 ]; then
+    heal
+    response=$(mcpc --json --timeout "$TIMEOUT" "$SESSION" tools-call "$tool" "$@" 2>"$ERRF") && rc=0 || rc=$?
+  fi
+  if [ "$rc" != 0 ]; then
+    cat "$ERRF" >&2
+    [ "$rc" = 4 ] && echo "fullstory: auth failed — run 'fullstory setup'" >&2
+    return "$rc"
+  fi
+  if jq -e '.isError == true' <<<"$response" >/dev/null 2>&1; then
+    jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' <<<"$response" >&2
+    return 2
+  fi
+  render <<<"$response"
+}
+
+usage() {
+  cat <<'EOF'
+fullstory — Fullstory CLI (mcpc-backed). Output is JSON when server returns JSON.
+
+session:
+  fullstory setup                         OAuth, or API key from env/file
+  fullstory status                        session state
+  fullstory tools [pattern]               list/search live MCP tools
+  fullstory call TOOL [k:=v ...]          raw tool passthrough
+
+analytics:
+  fullstory metric get REGEX
+  fullstory metric build OUTPUT_TYPE QUERY
+  fullstory metric update ID REFINEMENT [OUTPUT_TYPE]
+  fullstory metric compute ID [TIME_RANGE]
+  fullstory segment get REGEX
+  fullstory segment build QUERY
+  fullstory segment update DEFINITION_JSON REFINEMENT
+  fullstory funnel get QUERY [--owned]
+  fullstory funnel build QUERY
+  fullstory funnel compute ID
+  fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]
+
+sessions and pages:
+  fullstory sessions (--metric ID | --segment ID)
+  fullstory session events DEVICE_ID SESSION_ID
+  fullstory session open DEVICE_ID SESSION_ID
+  fullstory session screenshot CLIENT_ID PAGE_ID TIMESTAMP
+  fullstory session tree CLIENT_ID PAGE_ID TIMESTAMP
+  fullstory session diff CLIENT_ID PAGE_ID FROM_TS TO_TS
+  fullstory session close CLIENT_ID
+  fullstory pages [REGEX]
+
+opportunities (thin aliases; pass MCP arguments as k:=v):
+  fullstory opportunity discover [k:=v ...]
+  fullstory opportunity stats k:=v ...
+  fullstory opportunity classify k:=v ...
+  fullstory opportunity list [k:=v ...]
+  fullstory opportunity get k:=v ...
+  fullstory opportunity sessions k:=v ...
+
+global flags: --raw  -c/--compact  --timeout N  --session @name
+env: FULLSTORY_SESSION FULLSTORY_SERVER FULLSTORY_TIMEOUT FULLSTORY_API_KEY
+key file: ~/.config/fullstory/env (mode 600; FULLSTORY_API_KEY=...)
+EOF
+}
+
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --raw) RAW=1; shift ;;
+    -c|--compact) COMPACT=1; shift ;;
+    --timeout) TIMEOUT=${2:?--timeout needs a value}; shift 2 ;;
+    --session) SESSION=${2:?--session needs a value}; shift 2 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  help|-h|--help) usage ;;
+  setup)
+    if load_api_key; then
+      connect_session && mcpc "$SESSION" ping && echo "fullstory: ready (API key)"
+    else
+      mcpc login "$SERVER" &&
+      { mcpc connect "$SERVER" "$SESSION" 2>/dev/null || mcpc restart "$SESSION"; } &&
+      mcpc "$SESSION" ping && echo "fullstory: ready (OAuth)"
+    fi ;;
+  status) mcpc "$SESSION" ;;
+  tools)
+    if [ -n "${1:-}" ]; then mcpc "$SESSION" grep "$1" --tools
+    else mcpc "$SESSION" tools-list; fi ;;
+  call)
+    tool=${1:?usage: fullstory call TOOL [k:=v ...]}; shift
+    invoke_args "$tool" "$@" ;;
+  metric)
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    case "$sub" in
+      get) invoke_json get_metric "$(jq -n --arg regex "${1:?usage: fullstory metric get REGEX}" '{regex:$regex}')" ;;
+      build) output=${1:?usage: fullstory metric build OUTPUT_TYPE QUERY}; query=${2:?usage: fullstory metric build OUTPUT_TYPE QUERY}; invoke_json build_metric "$(jq -n --arg query "$query" --arg output_type "$output" '{query:$query,output_type:$output_type}')" ;;
+      update) id=${1:?usage: fullstory metric update ID REFINEMENT}; refinement=${2:?usage: fullstory metric update ID REFINEMENT}; output=${3:-}; if [ -n "$output" ]; then args=$(jq -n --arg metric_id "$id" --arg refinement "$refinement" --arg output_type "$output" '{metric_id:$metric_id,refinement:$refinement,output_type:$output_type}'); else args=$(jq -n --arg metric_id "$id" --arg refinement "$refinement" '{metric_id:$metric_id,refinement:$refinement}'); fi; invoke_json update_metric "$args" ;;
+      compute) id=${1:?usage: fullstory metric compute ID [TIME_RANGE]}; range=${2:-}; if [ -n "$range" ]; then args=$(jq -n --arg metric_id "$id" --arg time_range "$range" '{metric_id:$metric_id,time_range:$time_range}'); else args=$(jq -n --arg metric_id "$id" '{metric_id:$metric_id}'); fi; invoke_json compute_metric "$args" ;;
+      *) die "usage: fullstory metric get|build|update|compute" ;;
+    esac ;;
+  segment)
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    case "$sub" in
+      get) invoke_json get_segment "$(jq -n --arg regex "${1:?usage: fullstory segment get REGEX}" '{regex:$regex}')" ;;
+      build) invoke_json build_segment "$(jq -n --arg query "${1:?usage: fullstory segment build QUERY}" '{query:$query}')" ;;
+      update) definition=${1:?usage: fullstory segment update DEFINITION_JSON REFINEMENT}; refinement=${2:?usage: fullstory segment update DEFINITION_JSON REFINEMENT}; jq -e . >/dev/null 2>&1 <<<"$definition" || die "DEFINITION_JSON must be valid JSON"; invoke_json update_segment "$(jq -n --argjson segment_definition "$definition" --arg refinement "$refinement" '{segment_definition:$segment_definition,refinement:$refinement}')" ;;
+      *) die "usage: fullstory segment get|build|update" ;;
+    esac ;;
+  funnel)
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    case "$sub" in
+      get) query=${1:?usage: fullstory funnel get QUERY [--owned]}; owned=false; [ "${2:-}" = --owned ] && owned=true; invoke_json get_funnel "$(jq -n --arg regex "$query" --argjson owned "$owned" '{regex:$regex,owned:$owned}')" ;;
+      build) invoke_json build_funnel "$(jq -n --arg query "${1:?usage: fullstory funnel build QUERY}" '{query:$query}')" ;;
+      compute) invoke_json compute_funnel "$(jq -n --arg funnel_id "${1:?usage: fullstory funnel compute ID}" '{funnel_id:$funnel_id}')" ;;
+      sessions) id=${1:?usage: fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]}; step=${2:?usage: fullstory funnel sessions ID COMPLETED_STEP [--dropoffs]}; drop=false; [ "${3:-}" = --dropoffs ] && drop=true; invoke_json get_funnel_sessions "$(jq -n --arg funnel_id "$id" --argjson completed_step "$step" --argjson did_not_complete "$drop" '{funnel_id:$funnel_id,completed_step:$completed_step,did_not_complete:$did_not_complete}')" ;;
+      *) die "usage: fullstory funnel get|build|compute|sessions" ;;
+    esac ;;
+  sessions)
+    case "${1:-}" in
+      --metric) invoke_json get_sessions "$(jq -n --arg metric_id "${2:?--metric needs ID}" '{metric_id:$metric_id}')" ;;
+      --segment) invoke_json get_sessions "$(jq -n --arg segment_id "${2:?--segment needs ID}" '{segment_id:$segment_id}')" ;;
+      *) die "usage: fullstory sessions (--metric ID | --segment ID)" ;;
+    esac ;;
+  session)
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    case "$sub" in
+      events) invoke_json get_session_events "$(jq -n --arg device_id "${1:?DEVICE_ID required}" --arg session_id "${2:?SESSION_ID required}" '{device_id:$device_id,session_id:$session_id}')" ;;
+      open) invoke_json session_open "$(jq -n --arg device_id "${1:?DEVICE_ID required}" --arg session_id "${2:?SESSION_ID required}" '{device_id:$device_id,session_id:$session_id}')" ;;
+      screenshot) invoke_json session_screenshot "$(jq -n --arg client_id "${1:?CLIENT_ID required}" --arg page_id "${2:?PAGE_ID required}" --argjson timestamp "${3:?TIMESTAMP required}" '{client_id:$client_id,page_id:$page_id,timestamp:$timestamp}')" ;;
+      tree) invoke_json session_get_a11y_tree "$(jq -n --arg client_id "${1:?CLIENT_ID required}" --arg page_id "${2:?PAGE_ID required}" --argjson timestamp "${3:?TIMESTAMP required}" '{client_id:$client_id,page_id:$page_id,timestamp:$timestamp}')" ;;
+      diff) invoke_json session_diff "$(jq -n --arg client_id "${1:?CLIENT_ID required}" --arg page_id "${2:?PAGE_ID required}" --argjson from_ts "${3:?FROM_TS required}" --argjson to_ts "${4:?TO_TS required}" '{client_id:$client_id,page_id:$page_id,from_ts:$from_ts,to_ts:$to_ts}')" ;;
+      close) invoke_json session_close "$(jq -n --arg client_id "${1:?CLIENT_ID required}" '{client_id:$client_id}')" ;;
+      *) die "usage: fullstory session events|open|screenshot|tree|diff|close" ;;
+    esac ;;
+  pages)
+    if [ -n "${1:-}" ]; then invoke_json get_pages "$(jq -n --arg regex "$1" '{regex:$regex}')"; else invoke_json get_pages '{}'; fi ;;
+  opportunity)
+    sub=${1:-}; [ $# -gt 0 ] && shift
+    case "$sub" in
+      discover) invoke_args discover_groups "$@" ;;
+      stats) invoke_args get_opportunity_stats "$@" ;;
+      classify) invoke_args classify_opportunity "$@" ;;
+      list) invoke_args get_opportunities "$@" ;;
+      get) invoke_args get_opportunity "$@" ;;
+      sessions) invoke_args get_sessions_for_opportunity "$@" ;;
+      *) die "usage: fullstory opportunity discover|stats|classify|list|get|sessions [k:=v ...]" ;;
+    esac ;;
+  *) die "unknown command '$cmd' — run 'fullstory help'" ;;
+esac

@@ -47,6 +47,7 @@ sh -c 'git -C "$HOME/.tnfssc-skills" pull --ff-only && mkdir -p "$HOME/.agents/s
 |-------|-------------|--------|
 | [cua-driver](cua-driver/) | Drive native GUI apps (snapshot AX tree, click/type/scroll, verify) via the cua-driver CLI/MCP | [trycua/cua](https://github.com/trycua/cua) |
 | [figma-cli](figma-cli/) | Read Figma files, nodes, screenshots, comments, and team libraries via the bundled `figma` CLI | [Figma REST API](https://www.figma.com/developers/api) |
+| [fullstory-cli](fullstory-cli/) | Analyze behavior, funnels, opportunities, and sessions via the bundled mcpc-backed `fullstory` CLI | [Fullstory MCP](https://developer.fullstory.com/mcp/) |
 | [gcx](gcx/) | Manage Grafana Cloud resources through the unified `gcx` CLI | [grafana/gcx](https://github.com/grafana/gcx) |
 | [hallmark](hallmark/) | Design and audit interfaces with an anti-AI-slop visual discipline | [nutlope/hallmark](https://github.com/nutlope/hallmark) |
 | [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |

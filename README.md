@@ -50,7 +50,7 @@ sh -c 'git -C "$HOME/.tnfssc-skills" pull --ff-only && mkdir -p "$HOME/.agents/s
 | [fullstory-cli](fullstory-cli/) | Analyze behavior, funnels, opportunities, and sessions via the bundled mcpc-backed `fullstory` CLI | [Fullstory MCP](https://developer.fullstory.com/mcp/) |
 | [gcx](gcx/) | Manage Grafana Cloud resources through the unified `gcx` CLI | [grafana/gcx](https://github.com/grafana/gcx) |
 | [hallmark](hallmark/) | Design and audit interfaces with an anti-AI-slop visual discipline | [nutlope/hallmark](https://github.com/nutlope/hallmark) |
-| [host-sharath](host-sharath/) | Upload files to host.sharath.page for expiring, authenticated share links | [host.sharath.page](https://host.sharath.page) |
+| [hoard-upload](hoard-upload/) | Upload files to hoard.sharath.page for expiring, authenticated share links | [hoard.sharath.page](https://hoard.sharath.page) |
 | [jira-cli](jira-cli/) | Work with Jira issues, sprints, boards, projects, and JQL using the `jira` CLI | Local zip |
 | [langfuse-cli](langfuse-cli/) | Instrument, debug, and evaluate LLM apps with Langfuse — traces, prompts, datasets, and scores via the `langfuse` CLI | [langfuse/skills](https://github.com/langfuse/skills) |
 | [linear-cli](linear-cli/) | Work with Linear issues, projects, cycles, and docs via the bundled mcpc-backed `linear` CLI | [Linear MCP](https://linear.app/docs/mcp) |
